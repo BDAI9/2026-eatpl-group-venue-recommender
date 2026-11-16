@@ -20,6 +20,8 @@
 
 Lightsail의 임시 웹 주소는 별도 Distribution이 필요하며 인스턴스 요금 외에 추가 비용이 생긴다. 이를 사용할 경우 방별 정보가 공유 캐시에 저장되지 않도록 하고, 브라우저부터 원본 서버까지 HTTPS, 허용 호스트와 요청 전달을 검증해야 한다. 임시 웹 주소의 인증서가 원본 인스턴스에 자동 설치되는 것은 아니다. [웹 주소 안내](https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-web-addresses.html), [Distribution 원본 설정](https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-distribution-origins.html)
 
+2026-11-16 현재 `jj-moim.amazonlightsail.com`을 생성해 `jj-moim-distribution`에 연결했다. Distribution은 캐시 없음과 HTTPS 전용 원본 연결로 설정했지만, **서버 원본 인증서와 외부 웹 연결은 아직 완료되지 않아 이 주소로 앱을 사용할 수 없다.** 서버에 커밋 `681e64e`를 설치하고 K-Skill 설정으로 로컬 서비스 및 내부 HTTP 방 생성 → 참여 → 실제 카페 10건 추천을 검증했다. 서비스는 `127.0.0.1:8000`에만 바인딩돼 있다. 서버 월 $7, Distribution 월 $2.50이며 트래픽 초과 요금 등은 별도다.
+
 ## 외부에서 먼저 확인할 일
 
 1. 주최 측에 K-Skill 공개 프록시를 이용하는 대회 서비스의 별도 운영 승인과 노출 문구를 확인한다. 직접 API를 택할 경우 개발 및 운영 환경별 기관명·IP 등록과 승인 절차를 확인한다.
