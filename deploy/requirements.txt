@@ -1,0 +1,2 @@
+# Linux production WSGI server; the local demo does not require it.
+gunicorn>=23,<24
