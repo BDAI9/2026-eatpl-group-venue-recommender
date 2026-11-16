@@ -2,8 +2,8 @@
 
 Run this factory behind a TLS reverse proxy, with one Gunicorn worker.  This
 does not by itself make the application safe for public use; see the deployment
-checklist.  Unlike the local demonstration server, it refuses to start without
-explicit real-Eatpl and persistent-database configuration.
+checklist. Unlike the local demonstration server, it refuses sample data and
+requires an allowed live source and persistent-database configuration.
 """
 from __future__ import annotations
 
@@ -136,17 +136,21 @@ def _validate_existing_database(db_path: str) -> None:
 def create_app():
     """Fail closed when public deployment config is missing or ambiguous."""
     host = _hostname(os.environ.get("MOIM_ALLOWED_HOST", ""))
+    source = os.environ.get("EATPL_SOURCE", "auto").strip().lower() or "auto"
+    if source not in ("auto", "direct", "kskill"):
+        raise RuntimeError("deployment server requires direct Eatpl or explicit K-Skill mode")
     institution = os.environ.get("EATPL_INSTITUTION", "").strip()
     environment = os.environ.get("EATPL_ENV", "").strip()
     db_path = os.environ.get("MOIM_DB_PATH", "").strip()
-    if not institution:
-        raise RuntimeError("EATPL_INSTITUTION is required for the deployment server")
-    if environment not in ("dev", "prod"):
-        raise RuntimeError("EATPL_ENV must explicitly be dev or prod")
+    if source != "kskill":
+        if not institution:
+            raise RuntimeError("EATPL_INSTITUTION is required for the deployment server")
+        if environment not in ("dev", "prod"):
+            raise RuntimeError("EATPL_ENV must explicitly be dev or prod")
     if not db_path or not Path(db_path).is_absolute():
         raise RuntimeError("MOIM_DB_PATH must be an absolute persistent file path")
     _validate_existing_database(db_path)
     app = App(Store(db_path))
-    if app.client.source != "eatpl":
-        raise RuntimeError("deployment server requires actual Eatpl mode")
+    if app.client.source not in ("eatpl", "kskill"):
+        raise RuntimeError("deployment server requires actual Eatpl or K-Skill mode")
     return create_wsgi_app(app, host)

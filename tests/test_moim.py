@@ -19,7 +19,7 @@ from moim.store import Store  # noqa: E402
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
-    for k in ("OPENROUTER_API_KEY", "OPENROUTER_MODEL", "EATPL_INSTITUTION", "EATPL_ENV"):
+    for k in ("OPENROUTER_API_KEY", "OPENROUTER_MODEL", "EATPL_INSTITUTION", "EATPL_ENV", "EATPL_SOURCE"):
         monkeypatch.delenv(k, raising=False)
 
 

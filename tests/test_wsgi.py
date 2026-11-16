@@ -14,6 +14,11 @@ from moim.store import Store
 from moim.wsgi import create_app, create_wsgi_app
 
 
+@pytest.fixture(autouse=True)
+def clear_external_source(monkeypatch):
+    monkeypatch.delenv("EATPL_SOURCE", raising=False)
+
+
 @pytest.fixture
 def wsgi(tmp_path):
     return validator(create_wsgi_app(App(Store(str(tmp_path / "test.sqlite3")), SampleClient()), "demo.example.com"))

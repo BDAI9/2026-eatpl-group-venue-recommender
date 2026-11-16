@@ -17,15 +17,16 @@ import re
 import socket
 from pathlib import Path
 from urllib import error, request
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 DEV_URL = "https://dev-api.paybooc.ai/api/mer"
 PROD_URL = "https://api.paybooc.ai/api/mer"
+KSKILL_URL = "https://k-skill-proxy.nomadamas.org/v1/bccard-eatpl/search"
 SAMPLE_PATH = Path(__file__).resolve().parent / "data" / "sample_places.json"
 MAX_BYTES = 2_000_000
 
 CAFE_TYPES = {"카페"}
-BAR_TYPES = {"기타주점", "호프", "이자카야", "바(bar)"}
+BAR_TYPES = {"기타주점", "호프", "이자카야", "바(bar)", "주점", "칵테일바"}
 RESTAURANT_TYPES = {
     "일반한식", "서양음식", "중국음식", "일식회집", "갈비전문점", "한정식", "고기구이", "찜/탕/찌개", "치킨",
     "국수/면/만두", "해산물구이/찜", "김밥전문점", "분식", "기타외국식", "곱창전골/구이", "피자", "족발/보쌈",
@@ -139,6 +140,51 @@ class EatplClient:
         return [p for p in (map_place(r) for r in body["data"]) if p]
 
 
+class KSkillClient:
+    """Explicitly selected adapter to the third-party K-Skill proxy.
+
+    It is not the BC Card direct API. Review provider terms and attribution
+    requirements before public use.
+    """
+
+    source = "kskill"
+
+    def __init__(self, timeout: float = 20.0):
+        self.timeout = timeout
+
+    def search(self, location: str, business_type: str | None = None) -> list[dict]:
+        params = {"location": location}
+        if business_type:
+            params["merTpbuzNm"] = business_type
+        req = request.Request(KSKILL_URL + "?" + urlencode(params),
+                              headers={"Accept": "application/json"}, method="GET")
+        try:
+            with request.build_opener(_NoRedirect()).open(req, timeout=self.timeout) as resp:
+                raw = resp.read(MAX_BYTES + 1)
+        except error.HTTPError as exc:
+            raise EatplError("장소 검색 서비스를 이용할 수 없어요. 잠시 후 다시 시도해 주세요.") from exc
+        except (TimeoutError, socket.timeout) as exc:
+            raise EatplError("장소 검색 응답이 너무 늦어요.") from exc
+        except error.URLError as exc:
+            raise EatplError("장소 검색 서비스에 연결하지 못했어요.") from exc
+        if len(raw) > MAX_BYTES:
+            raise EatplError("장소 검색 응답이 너무 커요.")
+        try:
+            body = json.loads(raw)
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise EatplError("장소 검색 응답을 읽지 못했어요.") from exc
+        if not isinstance(body, dict) or not isinstance(body.get("items"), list):
+            raise EatplError("장소 검색 응답을 확인하지 못했어요.")
+        upstream = body.get("upstream")
+        if (not isinstance(upstream, dict) or upstream.get("status_code") != 200
+                or upstream.get("provider") not in ("bccard-eatpl", "bccard-eatpl-relay")):
+            raise EatplError("잇플에서 받은 장소 정보인지 확인하지 못했어요.")
+        # Do not return entries without a valid upstream detail URL; never
+        # construct a merchant link from untrusted response content.
+        places = (map_place(row) for row in body["items"])
+        return [place for place in places if place and place["eatpl_url"]]
+
+
 class SampleClient:
     """기관명이 없을 때 쓰는 가상 데이터. 지역 이름이 주소에 들어간 가게만 돌려준다."""
 
@@ -161,16 +207,34 @@ class SampleClient:
 
 
 def make_client(store):
+    source = os.getenv("EATPL_SOURCE", "auto").strip().lower() or "auto"
     institution = os.getenv("EATPL_INSTITUTION", "").strip()
+    if source == "kskill":
+        return KSkillClient()
+    if source == "sample":
+        return SampleClient()
+    if source == "direct" and not institution:
+        raise ValueError("직접 API 기관명이 필요해요.")
+    if source not in ("auto", "direct"):
+        raise ValueError("지원하지 않는 장소 데이터 원천이에요.")
     if institution:
         return EatplClient(institution, store.next_trace_number, prod=os.getenv("EATPL_ENV", "").strip() == "prod")
     return SampleClient()
 
 
 def search_places(client, region: str, place_type: str) -> list[dict]:
-    """지역과 장소 종류로 후보를 모은다. 카페는 업종으로 바로 검색, 나머지는 지역 검색 후 분류."""
+    """지역과 장소 종류로 후보를 모은다.
+
+    실제 술집 검색은 제공처의 대분류 둘로 조회하고 응답 소분류로 다시 거른다.
+    업종 체계가 일치하지 않거나 응답 건수에 제한이 있어 완전한 목록은 아니다.
+    """
     seen, out = set(), []
-    calls = [("카페",)] if place_type == "cafe" else [(None,)]
+    if place_type == "cafe":
+        calls = [("카페",)]
+    elif place_type == "bar" and client.source in ("eatpl", "kskill"):
+        calls = [("주점",), ("칵테일바",)]
+    else:
+        calls = [(None,)]
     for (btype,) in calls:
         for p in client.search(region, btype):
             if p["category"] == place_type and p["id"] not in seen:
