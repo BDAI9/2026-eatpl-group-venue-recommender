@@ -3,7 +3,7 @@
 실행 (저장소 폴더에서):  python -m moim.diagnose
 옵션: --no-ai  --no-eatpl  --regions 홍대,성수,강남
 
-- 키·기관명은 보고서에 쓰지 않는다 (있는지 여부와 앞 글자만).
+- 키는 보고서에 쓰지 않는다 (설정 여부만 기록).
 - 결과: diagnose_report.md (사람이 읽는 요약), diagnose_report.json (전체 기록)
 - OpenRouter 요청은 모델 수 + 최대 3번, 잇플 요청은 지역 수 × 2 + 4번 정도 쓴다.
 """
@@ -35,8 +35,7 @@ TEST_PLACES = [
     {"id": "t5", "name": "연남 비건 샐러드", "business_type": "비건/채식/사찰", "category": "restaurant"},
 ]
 TEST_ALLERGENS = ["갑각류(새우·게)", "밀·글루텐", "우유·유제품"]
-BAR_TYPES = ["호프", "이자카야", "바(bar)", "기타주점"]
-SOURCE_LABEL = {"eatpl": "잇플 직접 API", "kskill": "K-Skill 프록시(잇플)", "sample": "샘플(가상)"}
+SOURCE_LABEL = {"kskill": "K-Skill 프록시(잇플)", "sample": "샘플(가상)"}
 
 GROUPS = [
     ("식당 · 한식/일식 · 갑각류 알레르기", "restaurant", [
@@ -53,19 +52,13 @@ GROUPS = [
 ]
 
 
-def _mask(value: str) -> str:
-    return f"{value[:1]}***({len(value)}자)" if value else "(없음)"
-
-
 def _now() -> float:
     return time.perf_counter()
 
 
 def check_env() -> dict:
-    inst = os.getenv("EATPL_INSTITUTION", "").strip()
     return {
-        "eatpl_institution": _mask(inst),
-        "eatpl_env": os.getenv("EATPL_ENV", "").strip() or "dev",
+        "eatpl_source": os.getenv("EATPL_SOURCE", "sample").strip() or "sample",
         "openrouter_key": "있음" if os.getenv("OPENROUTER_API_KEY", "").strip() else "없음",
         "openrouter_models": estimate._models(),
     }
@@ -75,8 +68,7 @@ def check_ai(api_key: str) -> list[dict]:
     """모델마다 같은 5개 가게를 추정시켜 응답 형식·속도·내용을 기록한다."""
     all_styles = list(dict.fromkeys(x for t in options.STYLES.values() for x in t))  # 식당·카페·술집이 섞여 있어서
     system = estimate._SYSTEM % (", ".join(options.ATMOSPHERES), ", ".join(all_styles))
-    user = json.dumps({"요청한 알레르기": TEST_ALLERGENS,
-                       "가게": [{"id": p["id"], "이름": p["name"], "업종": p["business_type"]} for p in TEST_PLACES]},
+    user = json.dumps({"가게": [{"id": p["id"], "이름": p["name"], "업종": p["business_type"]} for p in TEST_PLACES]},
                       ensure_ascii=False)
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     out = []
@@ -133,7 +125,7 @@ def check_eatpl(client, regions: list[str]) -> list[dict]:
     for r in regions:
         for loc in dict.fromkeys([r] + options.REGION_QUERIES.get(r, [])):
             calls += [(r, loc, None), (r, loc, "카페")]
-    bar_types = ["주점", "칵테일바"] if client.source == "kskill" else BAR_TYPES
+    bar_types = ["주점", "칵테일바"]
     first = options.REGION_QUERIES.get(regions[0], [regions[0]])[0]
     calls += [(regions[0], first, t) for t in bar_types]
     out = []
@@ -229,7 +221,7 @@ def main() -> None:
     args = ap.parse_args()
     load_dotenv()
     regions = [r.strip() for r in args.regions.split(",") if r.strip()]
-    store = Store(str(ROOT / "moim.sqlite3"))  # 거래추적번호 순번을 서버와 같이 써야 번호가 겹치지 않는다
+    store = Store(str(ROOT / "moim.sqlite3"))
     client = make_client(store)
     report = {"ran_at": time.strftime("%Y-%m-%d %H:%M:%S"), "env": check_env(),
               "data_source": SOURCE_LABEL.get(client.source, client.source)}
@@ -245,7 +237,7 @@ def main() -> None:
 
     if args.no_eatpl or client.source == "sample":
         report["eatpl"] = None
-        print("3) 잇플 확인 건너뜀" + ("" if args.no_eatpl else " (기관명·EATPL_SOURCE 설정 없음)"))
+        print("3) 잇플 확인 건너뜀" + ("" if args.no_eatpl else " (샘플 모드)"))
     else:
         print("3) 잇플 검색 확인")
         report["eatpl"] = check_eatpl(client, regions)

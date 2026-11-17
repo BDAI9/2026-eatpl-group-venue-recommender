@@ -1,12 +1,4 @@
-"""BC카드 잇플 가맹점 검색 API(직접 제휴) 클라이언트와 샘플 데이터.
-
-- 실제 모드: 환경 변수 EATPL_INSTITUTION(기관명)이 있으면 사용. 서버 IP를 잇플에 미리 등록해야 한다.
-  EATPL_ENV=prod면 운영 서버, 그 외에는 개발 서버.
-- 샘플 모드: 기관명이 없으면 moim/data/sample_places.json(가상 가게)을 쓴다. 화면에 '가상'이라고 표시한다.
-
-API 정의: POST {base}/v1/search, 본문 {trnsTrceNo, instNm, location?, merTpbuzNm?, merNm?}
-응답: {rspCode: "00000", data: [{merNm, merAddr, merUrl, merTpbuzNm, allSaleRnk, ccgSaleRnk, srtTime, endTime, ...}]}
-"""
+"""K-Skill 잇플 장소 검색, 응답 검증 및 로컬 샘플 데이터."""
 
 from __future__ import annotations
 
@@ -19,8 +11,6 @@ from pathlib import Path
 from urllib import error, request
 from urllib.parse import urlencode, urlsplit
 
-DEV_URL = "https://dev-api.paybooc.ai/api/mer"
-PROD_URL = "https://api.paybooc.ai/api/mer"
 KSKILL_URL = "https://k-skill-proxy.nomadamas.org/v1/bccard-eatpl/search"
 SAMPLE_PATH = Path(__file__).resolve().parent / "data" / "sample_places.json"
 MAX_BYTES = 2_000_000
@@ -122,55 +112,6 @@ def map_place(row, *, is_sample: bool = False) -> dict | None:
     }
 
 
-class EatplClient:
-    source = "eatpl"
-
-    def __init__(self, institution: str, trace_factory, *, prod: bool = False, timeout: float = 10.0):
-        if not institution or not institution.strip():
-            raise ValueError("기관명이 필요해요.")
-        self.institution = institution.strip()
-        self.trace_factory = trace_factory
-        self.base_url = PROD_URL if prod else DEV_URL
-        self.timeout = timeout
-
-    def search(self, location: str, business_type: str | None = None) -> list[dict]:
-        body = self.search_raw(location, business_type)
-        return [p for p in (map_place(r) for r in body["data"]) if p]
-
-    def search_raw(self, location: str, business_type: str | None = None) -> dict:
-        """응답 본문(dict)을 그대로 돌려준다. 실패하면 EatplError. 진단 스크립트도 쓴다."""
-        payload = {"trnsTrceNo": self.trace_factory(self.institution), "instNm": self.institution,
-                   "location": location}
-        if business_type:
-            payload["merTpbuzNm"] = business_type
-        req = request.Request(self.base_url + "/v1/search",
-                              data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-                              headers={"Content-Type": "application/json", "Accept": "application/json"},
-                              method="POST")
-        try:
-            with request.build_opener(_NoRedirect()).open(req, timeout=self.timeout) as resp:
-                raw = resp.read(MAX_BYTES + 1)
-        except error.HTTPError as e:
-            if e.code in (401, 403):
-                raise EatplError("잇플 인증에 실패했어요. 기관명과 서버 IP 등록을 확인해 주세요.") from e
-            raise EatplError(f"잇플 서버 오류가 났어요. (HTTP {e.code})") from e
-        except (TimeoutError, socket.timeout) as e:
-            raise EatplError("잇플 응답이 너무 늦어요.") from e
-        except error.URLError as e:
-            raise EatplError("잇플 서버에 연결하지 못했어요.") from e
-        if len(raw) > MAX_BYTES:
-            raise EatplError("잇플 응답이 너무 커요.")
-        try:
-            body = json.loads(raw)
-        except (ValueError, UnicodeDecodeError) as e:
-            raise EatplError("잇플 응답을 읽지 못했어요.") from e
-        if not isinstance(body, dict) or body.get("rspCode") != "00000" or not isinstance(body.get("data"), list):
-            code = body.get("rspCode") if isinstance(body, dict) else None
-            msg = (body.get("rspMsg") or body.get("message") or "") if isinstance(body, dict) else ""
-            raise EatplError(f"잇플 검색이 실패했어요. (응답 코드 {code}{', ' + str(msg)[:80] if msg else ''})")
-        return body
-
-
 class KSkillClient:
     """Explicitly selected adapter to the third-party K-Skill proxy.
 
@@ -217,7 +158,7 @@ class KSkillClient:
 
 
 class SampleClient:
-    """기관명이 없을 때 쓰는 가상 데이터. 지역 이름이 주소에 들어간 가게만 돌려준다."""
+    """로컬 개발용 가상 데이터. 지역 이름이 주소에 들어간 가게만 돌려준다."""
 
     source = "sample"
 
@@ -238,19 +179,13 @@ class SampleClient:
 
 
 def make_client(store):
-    source = os.getenv("EATPL_SOURCE", "auto").strip().lower() or "auto"
-    institution = os.getenv("EATPL_INSTITUTION", "").strip()
+    # store remains in the signature for callers that share the app factory.
+    source = os.getenv("EATPL_SOURCE", "sample").strip().lower() or "sample"
     if source == "kskill":
         return KSkillClient()
-    if source == "sample":
+    if source in ("sample", "auto"):  # old local .env files used auto
         return SampleClient()
-    if source == "direct" and not institution:
-        raise ValueError("직접 API 기관명이 필요해요.")
-    if source not in ("auto", "direct"):
-        raise ValueError("지원하지 않는 장소 데이터 원천이에요.")
-    if institution:
-        return EatplClient(institution, store.next_trace_number, prod=os.getenv("EATPL_ENV", "").strip() == "prod")
-    return SampleClient()
+    raise ValueError("지원하지 않는 장소 데이터 원천이에요. kskill 또는 sample을 사용해 주세요.")
 
 
 def search_places(client, region: str, place_type: str) -> list[dict]:
@@ -262,7 +197,7 @@ def search_places(client, region: str, place_type: str) -> list[dict]:
     seen, out = set(), []
     if place_type == "cafe":
         calls = [("카페",)]
-    elif place_type == "bar" and client.source in ("eatpl", "kskill"):
+    elif place_type == "bar" and client.source == "kskill":
         calls = [("주점",), ("칵테일바",)]
     else:
         calls = [(None,)]

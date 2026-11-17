@@ -1,8 +1,8 @@
 """Create a consistent snapshot of the room database without overwriting files.
 
-The snapshot contains participant data, edit tokens, and trace sequences.
-Restoring an older trace sequence can reuse transaction IDs; never restore it
-automatically or resume real API requests without checking the high-water mark.
+The snapshot contains participant data, edit tokens, and legacy trace sequences.
+Restoring it must be deliberate. If a direct API is reintroduced in the future,
+an older trace sequence must not be reused without checking its high-water mark.
 """
 from __future__ import annotations
 
@@ -90,7 +90,7 @@ def main(argv: list[str] | None = None) -> int:
     except BackupError as exc:
         parser.exit(1, f"백업 실패: {exc}\n")
     print("백업을 만들었습니다. 참가자 정보가 포함되므로 접근을 제한해 주세요.")
-    print("복원 전 잇플 요청을 중단하고 거래추적번호 순번 중복 방지 방안을 확인하세요.")
+    print("복원은 신중히 진행하세요. 과거 직접 API를 다시 사용할 경우 거래번호 순번을 확인해야 합니다.")
     return 0
 
 

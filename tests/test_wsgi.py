@@ -65,7 +65,7 @@ def test_room_flow_and_protected_token(wsgi):
     assert call(wsgi, f"/r/{room}")["status"] == 200
 
 
-def test_landing_uses_live_room_flow_and_only_exposes_needed_prototype_assets(wsgi):
+def test_landing_uses_live_room_flow_without_mock_assets(wsgi):
     landing = call(wsgi, "/")
     assert landing["status"] == 200
     assert b'/static/live-start.js' in landing["body"]
@@ -73,11 +73,11 @@ def test_landing_uses_live_room_flow_and_only_exposes_needed_prototype_assets(ws
     script = call(wsgi, "/static/live-start.js")
     assert script["status"] == 200
     assert b'/api/rooms' in script["body"]
-    for path in ("/frontend/css/style.css", "/frontend/js/views.js", "/frontend/js/config.js",
-                 "/frontend/js/state.js", "/frontend/js/api.js"):
+    for path in ("/static/landing.css", "/static/landing-view.js"):
         assert call(wsgi, path)["status"] == 200
-    # The prototype's controller still produces mock votes and links.
-    assert call(wsgi, "/frontend/js/app.js")["status"] == 404
+    # Prototype scripts with mock votes and links are not served.
+    for path in ("/frontend/js/app.js", "/frontend/js/api.js", "/frontend/js/views.js"):
+        assert call(wsgi, path)["status"] == 404
 
 
 def test_health_is_liveness_only(wsgi):
@@ -107,16 +107,12 @@ def test_invalid_bodies_are_rejected(wsgi):
 
 def test_deployment_factory_fails_closed(monkeypatch, tmp_path):
     monkeypatch.setenv("MOIM_ALLOWED_HOST", "demo.example.com")
-    monkeypatch.setenv("EATPL_ENV", "dev")
     monkeypatch.setenv("MOIM_DB_PATH", str(tmp_path / "test.sqlite3"))
-    monkeypatch.delenv("EATPL_INSTITUTION", raising=False)
-    with pytest.raises(RuntimeError, match="EATPL_INSTITUTION"):
-        create_app()
-    monkeypatch.setenv("EATPL_INSTITUTION", "test-institution")
-    monkeypatch.setenv("EATPL_ENV", "unexpected")
-    with pytest.raises(RuntimeError, match="EATPL_ENV"):
-        create_app()
-    monkeypatch.setenv("EATPL_ENV", "dev")
+    for source in ("", "direct", "sample", "auto"):
+        monkeypatch.setenv("EATPL_SOURCE", source)
+        with pytest.raises(RuntimeError, match="K-Skill"):
+            create_app()
+    monkeypatch.setenv("EATPL_SOURCE", "kskill")
     monkeypatch.setenv("MOIM_DB_PATH", "relative.sqlite3")
     with pytest.raises(RuntimeError, match="MOIM_DB_PATH"):
         create_app()
@@ -126,13 +122,12 @@ def test_deployment_factory_fails_closed(monkeypatch, tmp_path):
     assert not (tmp_path / "test.sqlite3").exists()
     initialize_new_database(str(tmp_path / "test.sqlite3"))
     response = call(validator(create_app()), "/api/options")
-    assert json.loads(response["body"])["data_source"] == "eatpl"
+    assert json.loads(response["body"])["data_source"] == "kskill"
 
 
 def test_deployment_refuses_incomplete_database_and_initializer_never_overwrites(monkeypatch, tmp_path):
     monkeypatch.setenv("MOIM_ALLOWED_HOST", "demo.example.com")
-    monkeypatch.setenv("EATPL_ENV", "dev")
-    monkeypatch.setenv("EATPL_INSTITUTION", "test-institution")
+    monkeypatch.setenv("EATPL_SOURCE", "kskill")
     path = tmp_path / "state.sqlite3"
     monkeypatch.setenv("MOIM_DB_PATH", str(path))
     with sqlite3.connect(path) as db:
@@ -147,8 +142,7 @@ def test_deployment_refuses_incomplete_database_and_initializer_never_overwrites
 
 def test_invalid_database_is_not_reinitialized(monkeypatch, tmp_path):
     monkeypatch.setenv("MOIM_ALLOWED_HOST", "demo.example.com")
-    monkeypatch.setenv("EATPL_ENV", "dev")
-    monkeypatch.setenv("EATPL_INSTITUTION", "test-institution")
+    monkeypatch.setenv("EATPL_SOURCE", "kskill")
     path = tmp_path / "state.sqlite3"
     monkeypatch.setenv("MOIM_DB_PATH", str(path))
     path.write_bytes(b"not sqlite")
@@ -160,8 +154,7 @@ def test_invalid_database_is_not_reinitialized(monkeypatch, tmp_path):
 @pytest.mark.parametrize("host", ["", "https://demo.example.com", "*.example.com", "a.example.com/path"])
 def test_factory_rejects_unsafe_hosts(monkeypatch, tmp_path, host):
     monkeypatch.setenv("MOIM_ALLOWED_HOST", host)
-    monkeypatch.setenv("EATPL_ENV", "dev")
-    monkeypatch.setenv("EATPL_INSTITUTION", "test-institution")
+    monkeypatch.setenv("EATPL_SOURCE", "kskill")
     monkeypatch.setenv("MOIM_DB_PATH", str(tmp_path / "test.sqlite3"))
     with pytest.raises(ValueError, match="MOIM_ALLOWED_HOST"):
         create_app()

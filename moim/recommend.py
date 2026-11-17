@@ -17,7 +17,7 @@ from collections import Counter
 
 from .eatpl import EatplError, search_places
 from .estimate import estimate_places, pending_ai
-from .options import BUDGETS, PLACE_TYPES, REGION_QUERIES, REGIONS
+from .options import BUDGETS, PLACE_TYPES, REGION_QUERIES, REGIONS, normalize_region
 
 TOP_N = 10
 AI_LIMIT = 12  # 실측: 무료 모델이 20곳이면 110~120초 → 화면 상위 10곳 + 여유 2곳  # 추천 한 번에 AI로 추정할 최대 가게 수 (= AI 요청 최대 1번)
@@ -149,7 +149,7 @@ def search_region(client, region: str, place_type: str) -> list[dict]:
     첫 검색이 실패하면 EatplError를 그대로 올리고, 보조 검색(두 번째 주소·카페류 업종) 실패는 건너뛴다.
     """
     real = client.source != "sample"
-    queries = REGION_QUERIES.get(region) if real else None
+    queries = REGION_QUERIES.get(normalize_region(region)) if real else None
     seen, out = set(), []
 
     def add(found):

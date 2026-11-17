@@ -4,6 +4,33 @@ from __future__ import annotations
 
 REGIONS = ["홍대", "합정", "연남", "성수", "건대", "강남", "신촌", "이태원", "종로", "을지로", "잠실", "여의도"]
 
+# 시작 화면과 사용자가 흔히 쓰는 역·동 이름을 검색 가능한 지역으로 맞춘다.
+# 명시한 별칭만 바꾸고 다른 직접 입력은 보존한다.
+REGION_ALIASES = {
+    "홍대입구": "홍대", "홍대입구역": "홍대",
+    "강남역": "강남", "성수동": "성수", "성수역": "성수",
+    "종로·광화문": "종로", "광화문": "종로", "광화문역": "종로",
+}
+
+REGION_ALIASES = {
+    "강남역": "강남",
+    "성수동": "성수",
+    "홍대입구": "홍대",
+    "홍대입구역": "홍대",
+    "종로·광화문": "종로",
+    "광화문": "종로",
+}
+
+
+def normalize_region(value: str) -> str:
+    value = value.strip()
+    return REGION_ALIASES.get(value, value)
+    
+def normalize_region(value: str) -> str:
+    clean = value.strip()
+    return REGION_ALIASES.get(clean.replace(" ", ""), clean)
+
+
 # 잇플 검색은 '주소 글자'로 찾는다. 주소에는 '홍대'·'건대'·'신촌'이 거의 없어서 실제 주소 표기로 바꿔 검색한다.
 # 2026-11-17 실데이터 확인: '홍대'는 카페 0곳, '신촌'은 절반이 서울 밖, '건대'는 23곳 → 아래 주소는 모두 서울 100%.
 REGION_QUERIES = {
@@ -85,7 +112,9 @@ def validate_preference(payload: object) -> dict:
         raise ValueError("알 수 없는 입력 항목이 있어요.")
 
     name = _text(payload.get("name"), "이름", MAX_NAME)
-    region = _text(payload.get("region"), "지역", MAX_CUSTOM)
+    region = normalize_region(
+    _text(payload.get("region"), "지역", MAX_CUSTOM)
+)
     place_type = payload.get("place_type")
     if place_type not in PLACE_TYPES:
         raise ValueError("카페·식당·술집 중 하나를 골라 주세요.")
