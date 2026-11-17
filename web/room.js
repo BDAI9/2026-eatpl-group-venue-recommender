@@ -244,7 +244,12 @@ $("leave-button").addEventListener("click", async () => {
   if (!me) return;
   try {
     await api(`/api/rooms/${encodeURIComponent(roomId)}/participants/${encodeURIComponent(me.id)}`, "DELETE", { token: me.token });
-  } catch { /* 이미 지워짐 */ }
+  } catch (err) {
+    // Keep the edit token until the server confirms deletion, so a network
+    // failure does not leave a participant behind without a way to edit it.
+    $("form-status").textContent = `삭제하지 못했어요. 다시 시도해 주세요. ${err.message}`;
+    return;
+  }
   saveMe(null);
   $("pref-form").reset();
   renderStyles();

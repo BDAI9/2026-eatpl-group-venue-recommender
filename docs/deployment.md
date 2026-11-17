@@ -8,7 +8,7 @@
 - 장소 검색은 `EATPL_SOURCE=kskill`, 선택적 AI 추정은 OpenRouter를 사용합니다.
 - 애플리케이션: `/opt/moim`, 환경 설정: `/etc/moim/moim.env`, 방 DB: `/var/lib/moim/moim.sqlite3`.
 
-**GitHub에 푸시해도 Lightsail은 자동 업데이트되지 않습니다.** 현재 저장소에는 배포 자동화가 없습니다. 검증한 `main` 커밋을 서버에 수동으로 반영하고 서비스를 다시 시작해야 합니다. 서버가 이전과 다른 커밋을 실행 중일 수 있으므로 확인합니다.
+**현재 확인된 배포 방법은 수동입니다.** 저장소에는 배포 자동화가 없으며, 서버에 별도 예약 작업이 있는지는 아직 확인하지 못했습니다. GitHub 푸시만으로 반영됐다고 가정하지 말고 검증한 `main` 커밋을 서버에 반영해 서비스를 다시 시작합니다. 서버가 실행 중인 커밋은 다음과 같이 확인합니다.
 
 ```bash
 sudo git -C /opt/moim rev-parse --short HEAD
