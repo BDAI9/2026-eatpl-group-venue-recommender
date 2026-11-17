@@ -289,7 +289,10 @@ $("copy-link").addEventListener("click", async () => {
   OPT = await api("/api/options");
   if (OPT.data_source === "sample") {
     $("source-note").hidden = false;
-    $("source-note").textContent = "샘플 모드: 잇플 기관명이 설정되지 않아 홍대·성수·강남의 가상 가게로 추천해요.";
+    $("source-note").textContent = "샘플 모드: 홍대·성수·강남의 가상 가게로 추천해요.";
+  } else if (OPT.data_source === "kskill") {
+    $("source-note").hidden = false;
+    $("source-note").textContent = "시험용 장소 데이터 · 출처: eat.pl 잇플 · BC카드 결제 데이터 기반";
   }
   buildForm();
   await refresh();

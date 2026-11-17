@@ -179,7 +179,8 @@ def main() -> None:
     app = App(Store(args.db))
     host = "0.0.0.0" if args.lan else "127.0.0.1"
     server = ThreadingHTTPServer((host, args.port), make_handler(app))
-    print(f"데이터: {'잇플 API' if app.client.source == 'eatpl' else '샘플(가상 가게)'}"
+    data_label = {"eatpl": "잇플 직접 API", "kskill": "K-Skill 프록시", "sample": "샘플(가상 가게)"}
+    print(f"데이터: {data_label.get(app.client.source, '알 수 없음')}"
           f" · AI 추정: {'켜짐' if os.getenv('OPENROUTER_API_KEY') else '꺼짐(키 없음)'}")
     print(f"이 컴퓨터에서 열기: http://127.0.0.1:{args.port}/")
     if args.lan and lan_ip():
