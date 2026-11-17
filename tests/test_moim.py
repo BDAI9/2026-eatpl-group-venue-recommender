@@ -63,6 +63,14 @@ def test_custom_region_and_other_allergy_allowed():
     assert p["region"] == "망원" and p["allergy_other"] == "키위"
 
 
+@pytest.mark.parametrize(("entered", "expected"), [
+    ("홍대입구역", "홍대"), ("강남역", "강남"), ("성수동", "성수"),
+    ("종로 · 광화문", "종로"), ("망원동", "망원동"),
+])
+def test_region_aliases_group_common_names_but_keep_custom_regions(entered, expected):
+    assert person("a", region=entered)["region"] == expected
+
+
 # ---------------------------------------------------------------- 집계
 def test_votes_pick_region_and_type():
     s = summarize([person("a"), person("b", region="성수", place_type="bar"), person("c", place_type="cafe"),
@@ -553,6 +561,14 @@ def test_region_uses_real_addresses_and_cafe_subtypes():
     assert ("홍대", "카페") not in client.calls and ("서울 마포구 서교동", "카페") in client.calls
     assert ("서울 마포구 서교동", "빵/도넛") in client.calls  # 베이커리·디저트 업종도 검색
     assert [p["name"] for p in places] == ["서교 커피", "홍대 도넛", "동교 카페"]  # 중복·서울 밖 제외
+
+
+def test_existing_room_with_alias_searches_canonical_addresses():
+    from moim.recommend import search_region
+    client = RealClient()
+    places = search_region(client, "홍대입구", "cafe")
+    assert ("서울 마포구 서교동", "카페") in client.calls
+    assert places
 
 
 def test_region_custom_name_and_sample_unchanged(store):
