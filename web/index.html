@@ -3,26 +3,24 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>함께 고르는 모임 장소</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <title>지금어디가 — 함께 고르는 모임 장소</title>
+  <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {theme: {extend: {fontFamily: {sans: ['Pretendard', 'system-ui', 'sans-serif']},
+      colors: {brand: {DEFAULT: '#bd2333', dark: '#991b28', light: '#fdf2f3', border: '#f7d4d8'}}}}};
+  </script>
+  <link rel="stylesheet" href="/frontend/css/style.css">
 </head>
-<body>
-  <main class="wrap narrow">
-    <p class="eyebrow">BDAI · 모임 장소 추천</p>
-    <h1>링크 하나로 모여서<br>다 같이 고르는 장소</h1>
-    <p class="lead">모임을 만들고 링크를 공유하세요. 각자 지역, 카페·식당·술집, 예산, 분위기, 알레르기를 체크하면 모두의 선호가 몰린 가게를 추천해 드려요.</p>
-    <form id="create-form" class="card">
-      <label for="title">모임 이름</label>
-      <input id="title" maxlength="40" placeholder="예: 금요일 동기 모임">
-      <button type="submit">모임 만들기</button>
-      <p id="create-status" class="status" role="status"></p>
-    </form>
-    <ol class="steps">
-      <li><strong>모임 만들기</strong> — 링크가 생겨요.</li>
-      <li><strong>링크 공유</strong> — 친구들이 각자 선호를 체크해요.</li>
-      <li><strong>추천 받기</strong> — 가게를 누르면 잇플로 이동해요.</li>
-    </ol>
-  </main>
-  <script src="/static/index.js"></script>
+<body class="min-h-dvh w-full flex items-center justify-center sm:py-6 sm:px-4">
+  <div id="app-shell" class="w-full max-w-[440px] min-h-dvh sm:min-h-0 sm:h-[calc(100dvh-3rem)] sm:max-h-[880px] bg-white sm:rounded-[36px] sm:shadow-[0_24px_64px_-16px_rgba(24,20,18,0.22)] sm:border sm:border-black/[0.06] flex flex-col overflow-hidden relative">
+    <main id="app-root" class="flex-1 flex flex-col h-full overflow-hidden relative">
+      <p>화면을 불러오는 중이에요.</p>
+    </main>
+    <div id="app-toast" role="status" class="pointer-events-none fixed sm:absolute bottom-6 left-1/2 -translate-x-1/2 z-50 opacity-0 transition-all duration-200 translate-y-2">
+      <div id="app-toast-text" class="bg-zinc-900/95 text-white text-xs font-medium px-4 py-2.5 rounded-full shadow-lg whitespace-nowrap backdrop-blur-sm"></div>
+    </div>
+  </div>
+  <script type="module" src="/static/live-start.js"></script>
 </body>
 </html>

@@ -144,7 +144,7 @@ function renderRoom(room) {
   const al = Object.entries(s.allergies);
   if (al.length) {
     const box = el("div", "tally");
-    box.append(el("h3", "", "알레르기 (추천에서 제외)"));
+    box.append(el("h3", "", "참여자의 알레르기"));
     al.forEach(([a, names]) => box.append(el("p", "tag warn", `${a} — ${names.join(", ")}`)));
     t.append(box);
   }
@@ -305,5 +305,16 @@ $("copy-link").addEventListener("click", async () => {
   } else if (me) {
     saveMe(null);
   }
+  // Pass the initial region only within the creator's browser session; the
+  // shared room URL itself contains no selected region.
+  try {
+    const key = `moim-start-region:${roomId}`;
+    const region = sessionStorage.getItem(key);
+    sessionStorage.removeItem(key);
+    if (!mine && region) {
+      if (OPT.regions.includes(region)) setChecked($("regions"), [region]);
+      else $("region-custom").value = region;
+    }
+  } catch { /* storage can be disabled; the form still works */ }
   setInterval(() => { if (!document.hidden) refresh(); }, 5000);
 })();
