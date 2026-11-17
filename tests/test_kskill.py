@@ -67,8 +67,6 @@ def test_explicit_source_selection_and_wsgi(monkeypatch, tmp_path):
     assert eatpl.make_client(store).source == "kskill"
     monkeypatch.setenv("MOIM_ALLOWED_HOST", "example.com")
     monkeypatch.setenv("MOIM_DB_PATH", path)
-    monkeypatch.delenv("EATPL_INSTITUTION", raising=False)
-    monkeypatch.delenv("EATPL_ENV", raising=False)
     app = create_app()
     environ = {}
     setup_testing_defaults(environ)
@@ -78,7 +76,7 @@ def test_explicit_source_selection_and_wsgi(monkeypatch, tmp_path):
     assert seen["status"].startswith("200 ")
     assert json.loads(body)["data_source"] == "kskill"
     monkeypatch.setenv("EATPL_SOURCE", "sample")
-    with pytest.raises(RuntimeError, match="requires direct"):
+    with pytest.raises(RuntimeError, match="K-Skill"):
         create_app()
     monkeypatch.setenv("EATPL_SOURCE", "wrong")
     with pytest.raises(ValueError, match="원천"):

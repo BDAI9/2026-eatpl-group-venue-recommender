@@ -16,7 +16,9 @@ def test_backup_restores_room_and_sequences_without_printing_contents(tmp_path, 
     store = Store(str(source))
     room = store.create_room("개인 모임")
     store.add_participant(room, {"name": "참여자", "allergies": ["땅콩"]})
-    trace = store.next_trace_number("demo")
+    # Legacy sequence data must survive backups even though K-Skill doesn't use it.
+    with sqlite3.connect(source) as db:
+        db.execute("INSERT INTO trace_sequence VALUES (?, ?, ?)", ("demo", "20261117", 1))
     assert main([str(source), str(target)]) == 0
     captured = capsys.readouterr()
     assert "땅콩" not in captured.out and "demo" not in captured.out
@@ -24,7 +26,6 @@ def test_backup_restores_room_and_sequences_without_printing_contents(tmp_path, 
     assert Store(str(target)).get_room(room) == store.get_room(room)
     with closing(sqlite3.connect(target)) as db:
         assert db.execute("SELECT sequence FROM trace_sequence").fetchone()[0] == 1
-        assert trace.endswith("0000000001")
         assert db.execute("PRAGMA quick_check").fetchone() == ("ok",)
     if os.name == "posix":
         assert target.stat().st_mode & 0o777 == 0o600

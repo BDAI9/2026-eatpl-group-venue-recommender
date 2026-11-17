@@ -136,21 +136,14 @@ def _validate_existing_database(db_path: str) -> None:
 def create_app():
     """Fail closed when public deployment config is missing or ambiguous."""
     host = _hostname(os.environ.get("MOIM_ALLOWED_HOST", ""))
-    source = os.environ.get("EATPL_SOURCE", "auto").strip().lower() or "auto"
-    if source not in ("auto", "direct", "kskill"):
-        raise RuntimeError("deployment server requires direct Eatpl or explicit K-Skill mode")
-    institution = os.environ.get("EATPL_INSTITUTION", "").strip()
-    environment = os.environ.get("EATPL_ENV", "").strip()
-    db_path = os.environ.get("MOIM_DB_PATH", "").strip()
+    source = os.environ.get("EATPL_SOURCE", "").strip().lower()
     if source != "kskill":
-        if not institution:
-            raise RuntimeError("EATPL_INSTITUTION is required for the deployment server")
-        if environment not in ("dev", "prod"):
-            raise RuntimeError("EATPL_ENV must explicitly be dev or prod")
+        raise RuntimeError("deployment server requires explicit K-Skill mode")
+    db_path = os.environ.get("MOIM_DB_PATH", "").strip()
     if not db_path or not Path(db_path).is_absolute():
         raise RuntimeError("MOIM_DB_PATH must be an absolute persistent file path")
     _validate_existing_database(db_path)
     app = App(Store(db_path))
-    if app.client.source not in ("eatpl", "kskill"):
-        raise RuntimeError("deployment server requires actual Eatpl or K-Skill mode")
+    if app.client.source != "kskill":
+        raise RuntimeError("deployment server requires actual K-Skill mode")
     return create_wsgi_app(app, host)

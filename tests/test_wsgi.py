@@ -107,16 +107,12 @@ def test_invalid_bodies_are_rejected(wsgi):
 
 def test_deployment_factory_fails_closed(monkeypatch, tmp_path):
     monkeypatch.setenv("MOIM_ALLOWED_HOST", "demo.example.com")
-    monkeypatch.setenv("EATPL_ENV", "dev")
     monkeypatch.setenv("MOIM_DB_PATH", str(tmp_path / "test.sqlite3"))
-    monkeypatch.delenv("EATPL_INSTITUTION", raising=False)
-    with pytest.raises(RuntimeError, match="EATPL_INSTITUTION"):
-        create_app()
-    monkeypatch.setenv("EATPL_INSTITUTION", "test-institution")
-    monkeypatch.setenv("EATPL_ENV", "unexpected")
-    with pytest.raises(RuntimeError, match="EATPL_ENV"):
-        create_app()
-    monkeypatch.setenv("EATPL_ENV", "dev")
+    for source in ("", "direct", "sample", "auto"):
+        monkeypatch.setenv("EATPL_SOURCE", source)
+        with pytest.raises(RuntimeError, match="K-Skill"):
+            create_app()
+    monkeypatch.setenv("EATPL_SOURCE", "kskill")
     monkeypatch.setenv("MOIM_DB_PATH", "relative.sqlite3")
     with pytest.raises(RuntimeError, match="MOIM_DB_PATH"):
         create_app()
@@ -126,13 +122,12 @@ def test_deployment_factory_fails_closed(monkeypatch, tmp_path):
     assert not (tmp_path / "test.sqlite3").exists()
     initialize_new_database(str(tmp_path / "test.sqlite3"))
     response = call(validator(create_app()), "/api/options")
-    assert json.loads(response["body"])["data_source"] == "eatpl"
+    assert json.loads(response["body"])["data_source"] == "kskill"
 
 
 def test_deployment_refuses_incomplete_database_and_initializer_never_overwrites(monkeypatch, tmp_path):
     monkeypatch.setenv("MOIM_ALLOWED_HOST", "demo.example.com")
-    monkeypatch.setenv("EATPL_ENV", "dev")
-    monkeypatch.setenv("EATPL_INSTITUTION", "test-institution")
+    monkeypatch.setenv("EATPL_SOURCE", "kskill")
     path = tmp_path / "state.sqlite3"
     monkeypatch.setenv("MOIM_DB_PATH", str(path))
     with sqlite3.connect(path) as db:
@@ -147,8 +142,7 @@ def test_deployment_refuses_incomplete_database_and_initializer_never_overwrites
 
 def test_invalid_database_is_not_reinitialized(monkeypatch, tmp_path):
     monkeypatch.setenv("MOIM_ALLOWED_HOST", "demo.example.com")
-    monkeypatch.setenv("EATPL_ENV", "dev")
-    monkeypatch.setenv("EATPL_INSTITUTION", "test-institution")
+    monkeypatch.setenv("EATPL_SOURCE", "kskill")
     path = tmp_path / "state.sqlite3"
     monkeypatch.setenv("MOIM_DB_PATH", str(path))
     path.write_bytes(b"not sqlite")
@@ -160,8 +154,7 @@ def test_invalid_database_is_not_reinitialized(monkeypatch, tmp_path):
 @pytest.mark.parametrize("host", ["", "https://demo.example.com", "*.example.com", "a.example.com/path"])
 def test_factory_rejects_unsafe_hosts(monkeypatch, tmp_path, host):
     monkeypatch.setenv("MOIM_ALLOWED_HOST", host)
-    monkeypatch.setenv("EATPL_ENV", "dev")
-    monkeypatch.setenv("EATPL_INSTITUTION", "test-institution")
+    monkeypatch.setenv("EATPL_SOURCE", "kskill")
     monkeypatch.setenv("MOIM_DB_PATH", str(tmp_path / "test.sqlite3"))
     with pytest.raises(ValueError, match="MOIM_ALLOWED_HOST"):
         create_app()

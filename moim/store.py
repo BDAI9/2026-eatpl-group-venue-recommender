@@ -1,4 +1,4 @@
-"""SQLite 저장소: 모임방, 참여자, 잇플 거래추적번호 순번, AI 추정 캐시."""
+"""SQLite 저장소: 모임방, 참여자와 AI 추정 캐시."""
 
 from __future__ import annotations
 
@@ -8,11 +8,8 @@ import sqlite3
 import threading
 import time
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
 
 from .options import MAX_PARTICIPANTS
-
-KST = timezone(timedelta(hours=9))
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS rooms (
@@ -85,21 +82,6 @@ class Store:
             cur = db.execute("DELETE FROM participants WHERE id = ? AND room_id = ? AND token = ?",
                              (pid, room_id, token))
         return cur.rowcount == 1
-
-    # ---- 잇플 거래추적번호: 기관명 + YYYYMMDD + 10자리 순번 ----
-    def next_trace_number(self, institution: str) -> str:
-        day = datetime.now(KST).strftime("%Y%m%d")
-        with self._lock, self._db() as db:
-            db.execute("BEGIN IMMEDIATE")
-            db.execute("INSERT OR IGNORE INTO trace_sequence VALUES (?, ?, 0)", (institution, day))
-            db.execute("UPDATE trace_sequence SET sequence = sequence + 1 WHERE institution = ? AND day = ?",
-                       (institution, day))
-            seq = db.execute("SELECT sequence FROM trace_sequence WHERE institution = ? AND day = ?",
-                             (institution, day)).fetchone()[0]
-            db.execute("COMMIT")
-        if seq >= 10 ** 10:
-            raise ValueError("오늘 사용할 수 있는 거래추적번호를 모두 썼어요.")
-        return f"{institution}{day}{seq:010d}"
 
     # ---- AI 추정 캐시 ----
     def get_estimates(self, place_ids: list[str], allergens: list[str]) -> dict:
