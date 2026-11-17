@@ -65,7 +65,8 @@ def test_custom_region_and_other_allergy_allowed():
 
 @pytest.mark.parametrize(("entered", "expected"), [
     ("홍대입구역", "홍대"), ("강남역", "강남"), ("성수동", "성수"),
-    ("종로 · 광화문", "종로"), ("망원동", "망원동"),
+    ("종로 · 광화문", "종로"), ("광화문역", "종로"),
+    ("성수역", "성수"), ("망원동", "망원동"),
 ])
 def test_region_aliases_group_common_names_but_keep_custom_regions(entered, expected):
     assert person("a", region=entered)["region"] == expected
