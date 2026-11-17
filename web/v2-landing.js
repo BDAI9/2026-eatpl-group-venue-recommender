@@ -144,4 +144,3 @@ function renderPage1() {
     </div>
   `;
 }
-

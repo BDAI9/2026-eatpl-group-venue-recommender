@@ -3,7 +3,8 @@
 // Actual room and recommendation API behind the team's six-screen design.
 const STATE = { currentPage: 1, location: '', decisionMode: 'group', placeType: 'restaurant',
   styles: [], name: '', budget: '', atmospheres: [], allergies: [], allergyOther: '',
-  options: null, room: null, id: null, me: null, result: null, error: '', loading: false };
+  options: null, room: null, id: null, me: null, result: null, error: '', loading: false,
+  recRegion: '', recType: '' };
 const QUICK_DISTRICTS = ['강남', '성수', '홍대', '을지로', '여의도', '잠실', '종로', '합정'];
 const icons = {restaurant:'🍚', cafe:'☕', bar:'🍻'};
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -67,9 +68,13 @@ function renderPage5() { const room=STATE.room; const people=room?.participants 
  <p id="group-status" class="text-xs text-red-700 mt-3">${esc(STATE.error)}</p></div>
  <div class="mt-5 space-y-2"><button type="button" onclick="openResults()" class="w-full py-3.5 rounded-2xl bg-[#bd2333] text-white font-bold text-sm">추천 확인하기 →</button><button type="button" onclick="editMe()" class="w-full py-3 rounded-2xl border border-gray-200 text-gray-700 font-bold text-xs">${STATE.me?'내 조건 수정':'참여하기'}</button>${STATE.me?'<button type="button" onclick="deleteMe()" class="w-full py-2 text-gray-500 text-xs underline">내 응답 삭제</button>':''}</div></div>`; }
 function renderPage6() { const data=STATE.result; let body='';
+ const regions=[...new Set([...Object.keys(STATE.room?.summary?.regions || {}), ...(STATE.options?.regions || []), STATE.recRegion].filter(Boolean))];
+ const selectedRegion=STATE.recRegion || data?.region || STATE.room?.summary?.region || '';
+ const selectedType=STATE.recType || data?.place_type || STATE.room?.summary?.place_type || '';
  if(data?.status==='ok') body=`<div class="mt-5 space-y-3">${data.results.map((r,i)=>`<${r.eatpl_url?'a':'div'} ${r.eatpl_url?`href="${esc(r.eatpl_url)}" target="_blank" rel="noopener"`:''} class="block p-4 rounded-3xl border border-gray-100 shadow-sm bg-white"><div class="flex items-center gap-2"><span class="w-7 h-7 rounded-lg bg-[#bd2333] text-white text-xs font-bold flex items-center justify-center">${i+1}</span><strong class="text-sm">${esc(r.name)}</strong><span class="text-[10px] text-gray-500">${esc(r.business_type||'')}</span></div><p class="text-xs text-gray-500 mt-2">${esc(r.address||'')}</p>${(r.reasons||[]).map(x=>`<p class="text-xs text-gray-700 mt-1">• ${esc(x)}</p>`).join('')}${(r.cautions||[]).map(x=>`<p class="text-xs text-red-700 mt-1">${esc(x)}</p>`).join('')}<p class="text-[11px] text-gray-500 mt-2">${r.estimate?.source==='ai'?'AI 가격·분위기 추정 포함':'업종 정보 기준'}</p><p class="text-xs text-[#bd2333] font-bold mt-2">${r.eatpl_url?'잇플에서 보기 ↗':data.source==='sample'?'가상 가게 · 잇플 링크 없음':'잇플 링크 없음'}</p></${r.eatpl_url?'a':'div'}>`).join('')}</div>`;
  else if(data) body=`<p class="mt-5 p-4 rounded-2xl bg-gray-50 text-sm text-gray-600">${esc(data.message||'결과가 없어요. 지역이나 조건을 바꿔 주세요.')}</p>`;
- return `<div class="flex-1 p-5 page-enter"><div class="inline-flex px-3 py-1 rounded-lg bg-[#fdf2f3] text-[#bd2333] text-xs font-bold">함께 고른 추천</div><h2 class="text-2xl font-extrabold mt-3">어디로 갈까요?</h2><p class="text-xs text-gray-500 mt-2">${esc(STATE.location)} · ${esc(typeLabel())} · ${STATE.room?.summary?.count||0}명</p>
+ return `<div class="flex-1 p-5 page-enter"><div class="inline-flex px-3 py-1 rounded-lg bg-[#fdf2f3] text-[#bd2333] text-xs font-bold">함께 고른 추천</div><h2 class="text-2xl font-extrabold mt-3">어디로 갈까요?</h2><p class="text-xs text-gray-500 mt-2">${STATE.room?.summary?.count||0}명의 선택을 반영했어요.</p>
+ <div class="grid grid-cols-2 gap-2 mt-4"><label class="text-xs text-gray-600">지역<select id="rec-region" onchange="changeResultFilters()" class="block w-full rounded-xl border border-gray-200 p-2 mt-1">${regions.map(r=>`<option value="${esc(r)}" ${r===selectedRegion?'selected':''}>${esc(r)}</option>`).join('')}</select></label><label class="text-xs text-gray-600">장소<select id="rec-type" onchange="changeResultFilters()" class="block w-full rounded-xl border border-gray-200 p-2 mt-1">${Object.entries(STATE.options.place_types).map(([v,l])=>`<option value="${esc(v)}" ${v===selectedType?'selected':''}>${esc(l)}</option>`).join('')}</select></label></div>
  <p id="result-status" role="status" class="text-xs text-gray-600 mt-4">${STATE.loading?'가게를 찾고 있어요…':data?.ai_pending?'AI가 가격과 분위기를 추정하고 있어요. 잠시 후 자동 반영됩니다.':esc(STATE.error)}</p>${(data?.warnings||[]).map(w=>`<p class="text-xs text-amber-800 mt-2">${esc(w)}</p>`).join('')}${body}
  ${data?.excluded?.length?`<details class="mt-4 text-xs"><summary class="font-bold">알레르기 위험 신호로 제외된 곳 (${data.excluded.length})</summary>${data.excluded.map(p=>`<p class="mt-1">${esc(p.name)} · ${esc(p.reason)}</p>`).join('')}</details>`:''}
  <p class="text-[11px] text-gray-500 mt-5">가격·분위기는 추정값입니다. 실제 재료는 반드시 매장에 확인해 주세요.</p><button type="button" onclick="goToPage(5)" class="mt-5 text-xs font-bold text-[#bd2333]">← 참여 현황으로</button></div>`; }
@@ -99,9 +104,11 @@ function fillMe(person) { STATE.name=person.name; STATE.location=person.region; 
 function editMe() { if(STATE.me) { const person=STATE.room?.participants.find(p=>p.id===STATE.me.id); if(person) fillMe(person); } goToPage(3); }
 async function deleteMe() { if(!STATE.me) return; try { await api(`/api/rooms/${encodeURIComponent(STATE.id)}/participants/${encodeURIComponent(STATE.me.id)}`,'DELETE',{token:STATE.me.token}); saveMe(null); STATE.me=null; await refresh(); renderApp(); showToast('내 응답을 삭제했어요.'); } catch(err) { STATE.error='삭제하지 못했어요. '+err.message; renderApp(); } }
 async function copyLink() { try { await navigator.clipboard.writeText(location.origin+'/r/'+encodeURIComponent(STATE.id)); showToast('초대 링크를 복사했어요.'); } catch { $('share-link').select(); showToast('링크를 선택했어요. 복사해 주세요.'); } }
-function openResults() { if(!STATE.room?.summary?.count) return showToast('먼저 조건을 저장해 주세요.'); STATE.currentPage=6; getResults(); }
+function openResults() { if(!STATE.room?.summary?.count) return showToast('먼저 조건을 저장해 주세요.'); STATE.currentPage=6; STATE.recRegion=''; STATE.recType=''; getResults(); }
+function changeResultFilters() { STATE.recRegion=$('rec-region').value; STATE.recType=$('rec-type').value; getResults(); }
 async function getResults(retry=0, run=++resultRun) { STATE.loading=retry===0; STATE.error=''; if(!retry) STATE.result=null; renderApp();
- try { const data=await api(`/api/rooms/${encodeURIComponent(STATE.id)}/recommend`,'POST',{}); if(run!==resultRun) return;
+ try { const data=await api(`/api/rooms/${encodeURIComponent(STATE.id)}/recommend`,'POST',{
+  ...(STATE.recRegion ? {region:STATE.recRegion} : {}), ...(STATE.recType ? {place_type:STATE.recType} : {}) }); if(run!==resultRun) return;
  STATE.result=data; STATE.loading=false; STATE.location=data.region||STATE.location; STATE.placeType=data.place_type||STATE.placeType; renderApp();
  if(data.ai_pending && retry<30) setTimeout(()=>{ if(STATE.currentPage===6 && run===resultRun) getResults(retry+1,run); },6000);
  } catch(err) { if(run!==resultRun)return; STATE.loading=false; STATE.error=err.message; renderApp(); }
