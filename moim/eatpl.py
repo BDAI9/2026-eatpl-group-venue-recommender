@@ -108,6 +108,11 @@ class EatplClient:
         self.timeout = timeout
 
     def search(self, location: str, business_type: str | None = None) -> list[dict]:
+        body = self.search_raw(location, business_type)
+        return [p for p in (map_place(r) for r in body["data"]) if p]
+
+    def search_raw(self, location: str, business_type: str | None = None) -> dict:
+        """응답 본문(dict)을 그대로 돌려준다. 실패하면 EatplError. 진단 스크립트도 쓴다."""
         payload = {"trnsTrceNo": self.trace_factory(self.institution), "instNm": self.institution,
                    "location": location}
         if business_type:
@@ -135,8 +140,9 @@ class EatplClient:
             raise EatplError("잇플 응답을 읽지 못했어요.") from e
         if not isinstance(body, dict) or body.get("rspCode") != "00000" or not isinstance(body.get("data"), list):
             code = body.get("rspCode") if isinstance(body, dict) else None
-            raise EatplError(f"잇플 검색이 실패했어요. (응답 코드 {code})")
-        return [p for p in (map_place(r) for r in body["data"]) if p]
+            msg = (body.get("rspMsg") or body.get("message") or "") if isinstance(body, dict) else ""
+            raise EatplError(f"잇플 검색이 실패했어요. (응답 코드 {code}{', ' + str(msg)[:80] if msg else ''})")
+        return body
 
 
 class SampleClient:

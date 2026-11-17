@@ -237,18 +237,27 @@ function resultCard(r, i, source) {
   return li;
 }
 
-$("rec-button").addEventListener("click", async () => {
+const AI_RETRY_MS = 6000, AI_MAX_TRIES = 20; // 실측: 무료 AI 응답 40~70초 → 6초마다 최대 2분 다시 확인
+let recRun = 0;
+
+async function runRecommend(run, tries) {
   const status = $("rec-status");
-  status.textContent = "가게를 찾고 추정하는 중… (처음엔 몇 초 걸려요)";
-  $("results").replaceChildren(); $("rec-warnings").replaceChildren();
-  $("excluded-box").hidden = true;
   try {
     const data = await api(`/api/rooms/${encodeURIComponent(roomId)}/recommend`, "POST",
       { region: $("rec-region").value, place_type: $("rec-type").value });
+    if (run !== recRun) return; // 그사이 다시 눌렀으면 이전 결과는 버린다
+    $("results").replaceChildren(); $("rec-warnings").replaceChildren();
+    $("excluded-box").hidden = true;
     data.warnings.forEach((w) => $("rec-warnings").append(el("p", "notice", w)));
     status.textContent = data.status === "ok"
       ? `${data.region} ${OPT.place_types[data.place_type]} 추천 ${data.results.length}곳 · ${data.summary.count}명의 선호 반영`
       : data.message;
+    if (data.status === "ok" && data.ai_pending) {
+      status.textContent += tries < AI_MAX_TRIES
+        ? " · AI가 가격대·분위기를 분석하는 중이에요. 잠시 후 자동으로 다시 계산해요."
+        : " · AI 분석이 오래 걸려서 업종 정보 기준으로 보여 드려요. 잠시 뒤 다시 눌러 주세요.";
+      if (tries < AI_MAX_TRIES) setTimeout(() => runRecommend(run, tries + 1), AI_RETRY_MS);
+    }
     data.results.forEach((r, i) => $("results").append(resultCard(r, i, data.source)));
     if (data.excluded.length) {
       $("excluded-box").hidden = false;
@@ -256,8 +265,16 @@ $("rec-button").addEventListener("click", async () => {
       $("excluded").replaceChildren(...data.excluded.map((x) => el("li", "", `${x.name} — ${x.reason}`)));
     }
   } catch (err) {
-    status.textContent = err.message;
+    if (run === recRun) status.textContent = err.message;
   }
+}
+
+$("rec-button").addEventListener("click", () => {
+  recRun += 1;
+  $("rec-status").textContent = "가게를 찾는 중…";
+  $("results").replaceChildren(); $("rec-warnings").replaceChildren();
+  $("excluded-box").hidden = true;
+  runRecommend(recRun, 1);
 });
 
 // ---------- 시작 ----------
