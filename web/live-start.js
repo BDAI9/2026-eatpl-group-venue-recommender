@@ -1,5 +1,5 @@
 // The landing design uses the real room API, never simulated prototype data.
-import { renderPage1 } from '/frontend/js/views.js';
+import { renderPage1 } from '/static/landing-view.js';
 
 const root = document.getElementById('app-root');
 root.innerHTML = renderPage1();

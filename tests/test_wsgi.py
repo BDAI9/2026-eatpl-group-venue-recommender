@@ -65,7 +65,7 @@ def test_room_flow_and_protected_token(wsgi):
     assert call(wsgi, f"/r/{room}")["status"] == 200
 
 
-def test_landing_uses_live_room_flow_and_only_exposes_needed_prototype_assets(wsgi):
+def test_landing_uses_live_room_flow_without_mock_assets(wsgi):
     landing = call(wsgi, "/")
     assert landing["status"] == 200
     assert b'/static/live-start.js' in landing["body"]
@@ -73,11 +73,11 @@ def test_landing_uses_live_room_flow_and_only_exposes_needed_prototype_assets(ws
     script = call(wsgi, "/static/live-start.js")
     assert script["status"] == 200
     assert b'/api/rooms' in script["body"]
-    for path in ("/frontend/css/style.css", "/frontend/js/views.js", "/frontend/js/config.js",
-                 "/frontend/js/state.js", "/frontend/js/api.js"):
+    for path in ("/static/landing.css", "/static/landing-view.js"):
         assert call(wsgi, path)["status"] == 200
-    # The prototype's controller still produces mock votes and links.
-    assert call(wsgi, "/frontend/js/app.js")["status"] == 404
+    # Prototype scripts with mock votes and links are not served.
+    for path in ("/frontend/js/app.js", "/frontend/js/api.js", "/frontend/js/views.js"):
+        assert call(wsgi, path)["status"] == 404
 
 
 def test_health_is_liveness_only(wsgi):

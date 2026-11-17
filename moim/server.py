@@ -28,12 +28,8 @@ STATIC = {
     "/static/index.js": ("index.js", "text/javascript"),
     "/static/room.js": ("room.js", "text/javascript"),
     "/static/live-start.js": ("live-start.js", "text/javascript"),
-    # The other prototype pages still use simulated responses and are not live.
-    "/frontend/css/style.css": ("../frontend_v1/css/style.css", "text/css"),
-    "/frontend/js/views.js": ("../frontend_v1/js/views.js", "text/javascript"),
-    "/frontend/js/config.js": ("../frontend_v1/js/config.js", "text/javascript"),
-    "/frontend/js/state.js": ("../frontend_v1/js/state.js", "text/javascript"),
-    "/frontend/js/api.js": ("../frontend_v1/js/api.js", "text/javascript"),
+    "/static/landing.css": ("landing.css", "text/css"),
+    "/static/landing-view.js": ("landing-view.js", "text/javascript"),
 }
 ROOM_RE = re.compile(r"^/api/rooms/([A-Za-z0-9_-]{4,20})(/participants(?:/([A-Za-z0-9_-]{4,20}))?|/recommend)?$")
 
