@@ -3,7 +3,7 @@
 import json
 import sys
 import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
 from pathlib import Path
 from urllib import request as urlreq
 
@@ -214,71 +214,15 @@ def test_ai_invalid_values_dropped():
     assert c["allergy_risk"] == {"땅콩": "unknown"}
 
 
-# ---------------------------------------------------------------- 잇플 클라이언트 (가짜 서버)
-class FakeEatpl(BaseHTTPRequestHandler):
-    received = []
-    reply = None
+# ---------------------------------------------------------------- 데이터 원천 선택
 
-    def log_message(self, *a):
-        pass
-
-    def do_POST(self):
-        body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-        FakeEatpl.received.append(body)
-        status, payload = FakeEatpl.reply
-        raw = json.dumps(payload, ensure_ascii=False).encode()
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(raw)))
-        self.end_headers()
-        self.wfile.write(raw)
-
-
-@pytest.fixture
-def fake_eatpl(monkeypatch):
-    srv = ThreadingHTTPServer(("127.0.0.1", 0), FakeEatpl)
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
-    monkeypatch.setattr(eatpl, "DEV_URL", f"http://127.0.0.1:{srv.server_port}/api/mer")
-    FakeEatpl.received = []
-    yield FakeEatpl
-    srv.shutdown()
-
-
-def test_eatpl_request_and_mapping(fake_eatpl, store):
-    url = "https://web.paybooc.ai/mer/web/profile/abc123"
-    fake_eatpl.reply = (200, {"rspCode": "00000", "data": [
-        {"merNm": "실제 카페", "merAddr": "서울 마포구", "merUrl": url, "merTpbuzNm": "카페", "allSaleRnk": 3},
-        {"merNm": "나쁜 링크", "merAddr": "서울", "merUrl": "https://evil.example/x", "merTpbuzNm": "카페"},
-        {"merNm": "", "merAddr": "x"}]})
-    client = eatpl.EatplClient("BDAI", store.next_trace_number)
-    places = client.search("홍대", "카페")
-    sent = fake_eatpl.received[0]
-    assert sent["instNm"] == "BDAI" and sent["location"] == "홍대" and sent["merTpbuzNm"] == "카페"
-    assert sent["trnsTrceNo"].startswith("BDAI") and len(sent["trnsTrceNo"]) == 4 + 18
-    assert [p["name"] for p in places] == ["실제 카페", "나쁜 링크"]
-    assert places[0]["eatpl_url"] == url and places[1]["eatpl_url"] is None
-    client.search("홍대")
-    assert fake_eatpl.received[1]["trnsTrceNo"] != sent["trnsTrceNo"]  # 순번 증가
-
-
-@pytest.mark.parametrize("reply, msg", [
-    ((403, {}), "IP 등록"), ((500, {}), "HTTP 500"), ((200, {"rspCode": "E001"}), "E001")])
-def test_eatpl_errors(fake_eatpl, store, reply, msg):
-    fake_eatpl.reply = reply
-    with pytest.raises(eatpl.EatplError, match=msg):
-        eatpl.EatplClient("BDAI", store.next_trace_number).search("홍대")
-
-
-def test_recommend_reports_eatpl_error(fake_eatpl, store):
-    fake_eatpl.reply = (403, {})
-    out = recommend([person("a")], eatpl.EatplClient("BDAI", store.next_trace_number), store)
-    assert out["status"] == "error" and "IP" in out["message"]
-
-
-def test_make_client_uses_env(monkeypatch, store):
+def test_make_client_supports_kskill_and_sample_only(monkeypatch, store):
     assert eatpl.make_client(store).source == "sample"
-    monkeypatch.setenv("EATPL_INSTITUTION", "BDAI")
-    assert eatpl.make_client(store).source == "eatpl"
+    monkeypatch.setenv("EATPL_SOURCE", "kskill")
+    assert eatpl.make_client(store).source == "kskill"
+    monkeypatch.setenv("EATPL_SOURCE", "direct")
+    with pytest.raises(ValueError, match="kskill 또는 sample"):
+        eatpl.make_client(store)
 
 
 # ---------------------------------------------------------------- HTTP 서버 전체 흐름
@@ -480,21 +424,29 @@ def test_server_recommend_does_not_wait_for_ai(monkeypatch, server):
 
 
 # ---------------------------------------------------------------- 진단 스크립트
-def test_diagnose_runs_end_to_end(monkeypatch, tmp_path, fake_eatpl):
+def test_diagnose_runs_end_to_end(monkeypatch, tmp_path):
     from moim import diagnose
 
     url = "https://web.paybooc.ai/mer/web/profile/x1"
-    fake_eatpl.reply = (200, {"rspCode": "00000", "data": [
+    rows = [
         {"merNm": "홍대 이자카야 하루", "merAddr": "서울 마포구 홍대", "merUrl": url, "merTpbuzNm": "이자카야", "allSaleRnk": 12},
         {"merNm": "홍대 딸기 케이크", "merAddr": "서울 마포구 홍대", "merUrl": url + "2", "merTpbuzNm": "카페", "allSaleRnk": 5},
-        {"merNm": "홍대 우동집", "merAddr": "서울 마포구 홍대", "merUrl": url + "3", "merTpbuzNm": "국수/면/만두"}]})
+        {"merNm": "홍대 우동집", "merAddr": "서울 마포구 홍대", "merUrl": url + "3", "merTpbuzNm": "국수/면/만두"}]
+
+    class FakeKSkill:
+        source = "kskill"
+
+        def search(self, location, business_type=None):
+            return [eatpl.map_place(row) for row in rows]
+
+    monkeypatch.setattr(diagnose, "make_client", lambda store: FakeKSkill())
 
     def responder(model, user):
         return json.dumps({"places": [{"id": p["id"], "price_band": 2, "atmospheres": ["조용한"]} for p in user["가게"]]})
 
     fake_ai(monkeypatch, responder)
     monkeypatch.setattr(diagnose, "ROOT", tmp_path)
-    monkeypatch.setenv("EATPL_INSTITUTION", "BDAI")
+    monkeypatch.setenv("EATPL_SOURCE", "kskill")
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test-secret")
     monkeypatch.setenv("OPENROUTER_MODEL", "m1:free")
     monkeypatch.setattr(sys, "argv", ["diagnose", "--regions", "홍대"])
@@ -503,7 +455,7 @@ def test_diagnose_runs_end_to_end(monkeypatch, tmp_path, fake_eatpl):
     md = (tmp_path / "diagnose_report.md").read_text(encoding="utf-8")
     assert rep["ai"][0]["status"] == "ok" and rep["ai"][0]["ids_returned"] == "5/5"
     # 홍대: 원래 이름 + 실제 주소 2곳 × (전체·카페) + 술집 업종 4개
-    assert all(r["status"] == "ok" for r in rep["eatpl"]) and len(rep["eatpl"]) == 3 * 2 + 4
+    assert all(r["status"] == "ok" for r in rep["eatpl"]) and len(rep["eatpl"]) == 3 * 2 + 2
     assert [r["location"] for r in rep["eatpl"][:3:2]] == ["홍대", "서울 마포구 서교동"]
     assert rep["eatpl"][0]["detail_url_ok"] == 3 and rep["eatpl"][0]["allSaleRnk"]["min"] == 5
     assert {g["status"] for g in rep["recommend"]} <= {"ok", "empty"}
