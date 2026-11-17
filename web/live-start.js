@@ -54,4 +54,3 @@ window.toggleStartClearBtn = (value) => {
   clear.classList.toggle('flex', Boolean(value));
 };
 window.clearStartInput = () => { input.value = ''; window.toggleStartClearBtn(''); input.focus(); };
-
