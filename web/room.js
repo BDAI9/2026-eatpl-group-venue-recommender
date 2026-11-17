@@ -237,7 +237,7 @@ function resultCard(r, i, source) {
   return li;
 }
 
-const AI_RETRY_MS = 6000, AI_MAX_TRIES = 20; // 실측: 무료 AI 응답 40~70초 → 6초마다 최대 2분 다시 확인
+const AI_RETRY_MS = 6000, AI_MAX_TRIES = 30; // 실측: 실데이터 AI 반영 약 2분 → 6초마다 최대 3분 다시 확인
 let recRun = 0;
 
 async function runRecommend(run, tries) {

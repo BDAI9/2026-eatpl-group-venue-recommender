@@ -21,7 +21,7 @@ from pathlib import Path
 from urllib import error
 
 from . import estimate, options
-from .eatpl import EatplClient, EatplError, SampleClient, category_of, make_client, map_place, safe_detail_url
+from .eatpl import EatplError, SampleClient, make_client
 from . import recommend as rec_mod
 from .recommend import recommend
 from .server import ROOT, load_dotenv
@@ -36,6 +36,7 @@ TEST_PLACES = [
 ]
 TEST_ALLERGENS = ["갑각류(새우·게)", "밀·글루텐", "우유·유제품"]
 BAR_TYPES = ["호프", "이자카야", "바(bar)", "기타주점"]
+SOURCE_LABEL = {"eatpl": "잇플 직접 API", "kskill": "K-Skill 프록시(잇플)", "sample": "샘플(가상)"}
 
 GROUPS = [
     ("식당 · 한식/일식 · 갑각류 알레르기", "restaurant", [
@@ -111,42 +112,41 @@ def check_ai(api_key: str) -> list[dict]:
     return out
 
 
-def _summarize_rows(rows: list, region: str) -> dict:
-    places = [p for p in (map_place(r) for r in rows) if p]
-    ranks = [r.get("allSaleRnk") for r in rows if isinstance(r, dict) and isinstance(r.get("allSaleRnk"), (int, float))]
-    keys = Counter(k for r in rows if isinstance(r, dict) for k in r)
+def _summarize_places(places: list, region: str) -> dict:
+    ranks = [p["sales_rank"] for p in places if p.get("sales_rank") is not None]
     return {
-        "rows": len(rows),
-        "usable": len(places),
-        "business_types": dict(Counter(r.get("merTpbuzNm") for r in rows if isinstance(r, dict)).most_common(25)),
-        "categories": dict(Counter(category_of(r.get("merTpbuzNm")) for r in rows if isinstance(r, dict))),
-        "detail_url_ok": sum(1 for r in rows if isinstance(r, dict) and safe_detail_url(r.get("merUrl"))),
-        "address_has_region": sum(1 for r in rows if isinstance(r, dict) and region in (r.get("merAddr") or "")),
+        "rows": len(places),
+        "business_types": dict(Counter(p.get("business_type") for p in places).most_common(25)),
+        "categories": dict(Counter(p.get("category") for p in places)),
+        "detail_url_ok": sum(1 for p in places if p.get("eatpl_url")),
+        "in_seoul": sum(1 for p in places if (p.get("address") or "").startswith("서울")),
         "allSaleRnk": ({"min": min(ranks), "median": statistics.median(ranks), "max": max(ranks), "n": len(ranks)}
                        if ranks else None),
-        "fields": dict(keys),
-        "first_rows": [{k: r.get(k) for k in ("merNm", "merTpbuzNm", "merAddr", "allSaleRnk", "ccgSaleRnk",
-                                               "srtTime", "endTime")} | {"merUrl_ok": bool(safe_detail_url(r.get("merUrl")))}
-                       for r in rows[:5] if isinstance(r, dict)],
+        "first_rows": [{k: p.get(k) for k in ("name", "business_type", "category", "address", "sales_rank")}
+                       for p in places[:5]],
     }
 
 
-def check_eatpl(client: EatplClient, regions: list[str]) -> list[dict]:
-    calls = [(r, None) for r in regions] + [(r, "카페") for r in regions] + [(regions[0], t) for t in BAR_TYPES]
+def check_eatpl(client, regions: list[str]) -> list[dict]:
+    """지역마다 원래 이름과 실제 주소 표기(REGION_QUERIES)로 검색해 비교한다."""
+    calls = []
+    for r in regions:
+        for loc in dict.fromkeys([r] + options.REGION_QUERIES.get(r, [])):
+            calls += [(r, loc, None), (r, loc, "카페")]
+    bar_types = ["주점", "칵테일바"] if client.source == "kskill" else BAR_TYPES
+    first = options.REGION_QUERIES.get(regions[0], [regions[0]])[0]
+    calls += [(regions[0], first, t) for t in bar_types]
     out = []
-    for region, btype in calls:
-        rec = {"region": region, "merTpbuzNm": btype}
+    for region, loc, btype in calls:
+        rec = {"region": region, "location": loc, "merTpbuzNm": btype}
         t0 = _now()
         try:
-            body = client.search_raw(region, btype)
-            rec["seconds"] = round(_now() - t0, 2)
-            rec["status"] = "ok"
-            rec["other_response_keys"] = [k for k in body if k != "data"]
-            rec.update(_summarize_rows(body["data"], region))
+            places = client.search(loc, btype)
+            rec.update(status="ok", seconds=round(_now() - t0, 2), **_summarize_places(places, region))
         except EatplError as e:
             rec.update(status="error", message=str(e), seconds=round(_now() - t0, 2))
         out.append(rec)
-        print(f"  잇플 {region} {btype or '(전체)'}: {rec['status']} {rec.get('rows', '')}건")
+        print(f"  잇플 {loc} {btype or '(전체)'}: {rec['status']} {rec.get('rows', '')}건")
     return out
 
 
@@ -199,17 +199,16 @@ def to_markdown(report: dict) -> str:
                     L.append(f"- {name}: 가격대 {est['price_band']} · 분위기 {est['atmospheres']} · 종류 {est['styles']}"
                              f" · 알레르기 {est['allergy_risk']}")
     if report.get("eatpl") is not None:
-        L += ["", "## 잇플 검색", "", "| 지역 | 업종 | 결과 | 건수 | 쓸 수 있는 건 | 상세링크 OK | 주소에 지역명 | 초 |",
-              "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+        L += ["", "## 잇플 검색", "", "| 지역 | 검색 주소 | 업종 | 결과 | 건수 | 서울 | 상세링크 | 분류(카페/식당/술집/기타) | 초 |",
+              "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
         for r in report["eatpl"]:
-            L.append(f"| {r['region']} | {r['merTpbuzNm'] or '(전체)'} | {r['status']} {r.get('message', '')} | "
-                     f"{r.get('rows', '')} | {r.get('usable', '')} | {r.get('detail_url_ok', '')} | "
-                     f"{r.get('address_has_region', '')} | {r.get('seconds', '')} |")
-        ok = [r for r in report["eatpl"] if r["status"] == "ok"]
+            c = r.get("categories") or {}
+            L.append(f"| {r['region']} | {r['location']} | {r['merTpbuzNm'] or '(전체)'} | {r['status']} {r.get('message', '')} | "
+                     f"{r.get('rows', '')} | {r.get('in_seoul', '')} | {r.get('detail_url_ok', '')} | "
+                     f"{c.get('cafe', 0)}/{c.get('restaurant', 0)}/{c.get('bar', 0)}/{c.get('unknown', 0)} | {r.get('seconds', '')} |")
+        ok = [r for r in report["eatpl"] if r["status"] == "ok" and r.get("rows")]
         if ok:
-            first = ok[0]
-            L += ["", f"첫 검색({first['region']}) 업종 분포: {first['business_types']}",
-                  f"allSaleRnk: {first['allSaleRnk']}", f"응답 필드: {list(first['fields'])}"]
+            L += ["", f"첫 검색({ok[0]['location']}) 업종 분포: {ok[0]['business_types']}", f"allSaleRnk: {ok[0]['allSaleRnk']}"]
     if report.get("recommend") is not None:
         L += ["", "## 실제 추천 결과"]
         for g in report["recommend"]:
@@ -233,7 +232,7 @@ def main() -> None:
     store = Store(str(ROOT / "moim.sqlite3"))  # 거래추적번호 순번을 서버와 같이 써야 번호가 겹치지 않는다
     client = make_client(store)
     report = {"ran_at": time.strftime("%Y-%m-%d %H:%M:%S"), "env": check_env(),
-              "data_source": "잇플 API" if isinstance(client, EatplClient) else "샘플(가상)"}
+              "data_source": SOURCE_LABEL.get(client.source, client.source)}
     print("1) 설정:", report["env"])
 
     key = os.getenv("OPENROUTER_API_KEY", "").strip()
@@ -244,9 +243,9 @@ def main() -> None:
         print("2) OpenRouter 모델별 확인")
         report["ai"] = check_ai(key)
 
-    if args.no_eatpl or not isinstance(client, EatplClient):
+    if args.no_eatpl or client.source == "sample":
         report["eatpl"] = None
-        print("3) 잇플 확인 건너뜀" + ("" if args.no_eatpl else " (EATPL_INSTITUTION 없음)"))
+        print("3) 잇플 확인 건너뜀" + ("" if args.no_eatpl else " (기관명·EATPL_SOURCE 설정 없음)"))
     else:
         print("3) 잇플 검색 확인")
         report["eatpl"] = check_eatpl(client, regions)

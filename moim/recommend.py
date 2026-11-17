@@ -11,15 +11,16 @@ from __future__ import annotations
 
 import os
 import threading
+from concurrent.futures import ThreadPoolExecutor
 import time
 from collections import Counter
 
 from .eatpl import EatplError, search_places
 from .estimate import estimate_places, pending_ai
-from .options import BUDGETS, PLACE_TYPES, REGIONS
+from .options import BUDGETS, PLACE_TYPES, REGION_QUERIES, REGIONS
 
 TOP_N = 10
-AI_LIMIT = 20  # 추천 한 번에 AI로 추정할 최대 가게 수 (= AI 요청 최대 1번)
+AI_LIMIT = 12  # 실측: 무료 모델이 20곳이면 110~120초 → 화면 상위 10곳 + 여유 2곳  # 추천 한 번에 AI로 추정할 최대 가게 수 (= AI 요청 최대 1번)
 RETRY_AFTER = 300  # AI 추정이 실패하면 이 시간(초) 동안은 다시 시도하지 않는다 (무료 한도 보호)
 W_STYLE, W_BUDGET_FIT, W_BUDGET_OVER, W_ATMOS, W_MEDIUM_RISK = 3, 2, -2, 1, -2
 
@@ -138,6 +139,51 @@ def _start_ai_job(key, ordered, place_type, allergens, store, api_key) -> dict:
         return job
 
 
+# 카페 검색('카페')에 안 잡히는 카페류 업종. 디저트·베이커리를 고른 사람을 위해 따로 검색한다.
+CAFE_EXTRA_TYPES = ("기타베이커리", "빵/도넛", "아이스크림/요거트/빙수", "브런치카페/샐러드")
+
+
+def search_region(client, region: str, place_type: str) -> list[dict]:
+    """지역 이름을 실제 주소 표기로 바꿔 검색하고 합친다 (샘플 데이터는 지역 이름 그대로).
+
+    첫 검색이 실패하면 EatplError를 그대로 올리고, 보조 검색(두 번째 주소·카페류 업종) 실패는 건너뛴다.
+    """
+    real = client.source != "sample"
+    queries = REGION_QUERIES.get(region) if real else None
+    seen, out = set(), []
+
+    def add(found):
+        for p in found:
+            if p["category"] != place_type or p["id"] in seen:
+                continue
+            if queries and p.get("address") and not p["address"].startswith("서울"):
+                continue  # 다른 도시의 같은 동 이름 (예: 경기 평택시 합정동)
+            seen.add(p["id"])
+            out.append(p)
+
+    # 검색을 동시에 보내고(실측: 차례로 10번이면 4.5초), 결과는 보낸 순서대로 합친다
+    jobs = []
+    for loc in queries or [region]:
+        jobs.append((loc, None, True))
+        if real and place_type == "cafe":
+            jobs += [(loc, btype, False) for btype in CAFE_EXTRA_TYPES]
+
+    def run(job):
+        loc, btype, main = job
+        try:
+            return search_places(client, loc, place_type) if main else client.search(loc, btype), None
+        except EatplError as e:
+            return [], e
+
+    with ThreadPoolExecutor(max_workers=min(len(jobs), 6)) as pool:
+        results = list(pool.map(run, jobs))
+    for found, _ in results:
+        add(found)
+    if results[0][1] is not None:
+        raise results[0][1]  # 첫 주소의 기본 검색이 실패하면 알린다 (보조 검색 결과만 보여 주면 오해를 산다)
+    return out
+
+
 def recommend(people: list[dict], client, store=None, *, region: str | None = None,
               place_type: str | None = None, api_key: str | None = None, background: bool = False) -> dict:
     if not people:
@@ -151,7 +197,7 @@ def recommend(people: list[dict], client, store=None, *, region: str | None = No
     out = {"region": region, "place_type": place_type, "summary": summary, "source": client.source,
            "results": [], "excluded": [], "warnings": [], "status": "ok"}
     try:
-        places = search_places(client, region, place_type)
+        places = search_region(client, region, place_type)
     except EatplError as e:
         out.update(status="error", message=str(e))
         return out
