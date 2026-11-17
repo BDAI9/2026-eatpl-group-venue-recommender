@@ -12,20 +12,6 @@ REGION_ALIASES = {
     "종로·광화문": "종로", "광화문": "종로", "광화문역": "종로",
 }
 
-REGION_ALIASES = {
-    "강남역": "강남",
-    "성수동": "성수",
-    "홍대입구": "홍대",
-    "홍대입구역": "홍대",
-    "종로·광화문": "종로",
-    "광화문": "종로",
-}
-
-
-def normalize_region(value: str) -> str:
-    value = value.strip()
-    return REGION_ALIASES.get(value, value)
-    
 def normalize_region(value: str) -> str:
     clean = value.strip()
     return REGION_ALIASES.get(clean.replace(" ", ""), clean)
@@ -112,9 +98,7 @@ def validate_preference(payload: object) -> dict:
         raise ValueError("알 수 없는 입력 항목이 있어요.")
 
     name = _text(payload.get("name"), "이름", MAX_NAME)
-    region = normalize_region(
-    _text(payload.get("region"), "지역", MAX_CUSTOM)
-)
+    region = normalize_region(_text(payload.get("region"), "지역", MAX_CUSTOM))
     place_type = payload.get("place_type")
     if place_type not in PLACE_TYPES:
         raise ValueError("카페·식당·술집 중 하나를 골라 주세요.")
