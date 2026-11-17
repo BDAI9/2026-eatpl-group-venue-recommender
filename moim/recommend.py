@@ -17,7 +17,13 @@ from collections import Counter
 
 from .eatpl import EatplError, search_places
 from .estimate import estimate_places, pending_ai
-from .options import BUDGETS, PLACE_TYPES, REGION_QUERIES, REGIONS, normalize_region
+from .options import (
+    BUDGETS,
+    PLACE_TYPES,
+    REGION_QUERIES,
+    REGIONS,
+    normalize_region,
+)
 
 TOP_N = 10
 AI_LIMIT = 12  # 실측: 무료 모델이 20곳이면 110~120초 → 화면 상위 10곳 + 여유 2곳  # 추천 한 번에 AI로 추정할 최대 가게 수 (= AI 요청 최대 1번)
@@ -49,7 +55,7 @@ def _winner(counter: Counter, order: list[str]):
 
 
 def summarize(people: list[dict]) -> dict:
-    regions = Counter(p["region"] for p in people)
+    regions = Counter(normalize_region(p["region"]) for p in people)
     types = Counter(p["place_type"] for p in people)
     styles = {t: Counter(s for p in people if p["place_type"] == t for s in p["styles"]) for t in PLACE_TYPES}
     return {
@@ -144,6 +150,7 @@ CAFE_EXTRA_TYPES = ("기타베이커리", "빵/도넛", "아이스크림/요거�
 
 
 def search_region(client, region: str, place_type: str) -> list[dict]:
+    region = normalize_region(region)
     """지역 이름을 실제 주소 표기로 바꿔 검색하고 합친다 (샘플 데이터는 지역 이름 그대로).
 
     첫 검색이 실패하면 EatplError를 그대로 올리고, 보조 검색(두 번째 주소·카페류 업종) 실패는 건너뛴다.
@@ -189,7 +196,7 @@ def recommend(people: list[dict], client, store=None, *, region: str | None = No
     if not people:
         raise ValueError("아직 참여한 사람이 없어요.")
     summary = summarize(people)
-    region = (region or summary["region"] or "").strip()
+    region = normalize_region(region or summary["region"] or "")
     place_type = place_type or summary["place_type"]
     if not region or place_type not in PLACE_TYPES:
         raise ValueError("지역과 장소 종류를 확인해 주세요.")
