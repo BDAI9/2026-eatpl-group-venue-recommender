@@ -9,10 +9,13 @@ const QUICK_DISTRICTS = ['강남', '성수', '홍대', '을지로', '여의도',
 const icons = {restaurant:'🍚', cafe:'☕', bar:'🍻'};
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const $ = id => document.getElementById(id);
+// The hosted frontend uses the same live room database on Lightsail.
+// Keep this mapping fixed: tokens must never be sent to a user-provided URL.
+const API_ORIGIN = location.hostname === 'jj2ya.vercel.app' ? 'https://jj-moim.amazonlightsail.com' : '';
 let resultRun = 0;
 
 async function api(path, method='GET', body) {
-  const res = await fetch(path, {method, headers: body ? {'Content-Type':'application/json'} : {},
+  const res = await fetch(API_ORIGIN + path, {method, headers: body ? {'Content-Type':'application/json'} : {},
     body: body ? JSON.stringify(body) : undefined});
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || '요청에 실패했어요. 다시 시도해 주세요.');
