@@ -27,19 +27,6 @@ function showToast(message) {
 
 async function createRoom(region) {
   region = region.trim();
-
-  const aliases = {
-  "강남역": "강남",
-  "성수동": "성수",
-  "홍대입구": "홍대",
-  "홍대입구역": "홍대",
-  "종로·광화문": "종로",
-  "광화문": "종로",
-};
-
-  region = Object.prototype.hasOwnProperty.call(aliases, region)
-    ? aliases[region]
-    : region;
   if (!region) { showToast('동네나 역 이름을 입력해 주세요.'); input.focus(); return; }
   if (region.length > 40) { showToast('지역은 40자 이내로 입력해 주세요.'); return; }
   if (creating) return;
@@ -67,3 +54,4 @@ window.toggleStartClearBtn = (value) => {
   clear.classList.toggle('flex', Boolean(value));
 };
 window.clearStartInput = () => { input.value = ''; window.toggleStartClearBtn(''); input.focus(); };
+
