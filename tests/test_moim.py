@@ -343,7 +343,8 @@ def test_ai_called_at_most_once_and_skips_rule_excluded(monkeypatch, store):
 
     calls = fake_ai(monkeypatch, responder)
     out = recommend([person("a", allergies=["생선"])], ManyClient(), store, api_key="test")
-    assert len(calls) == 1 and len(seen[0]) == 20  # 51곳 중 상위 20곳만, 요청 1번
+    from moim.recommend import AI_LIMIT
+    assert len(calls) == 1 and len(seen[0]) == AI_LIMIT == 12  # 51곳 중 상위 12곳만, 요청 1번
     assert "바다 횟집" not in seen[0]  # 규칙상 이미 제외된 곳은 AI에 보내지 않음
     assert any(x["name"] == "바다 횟집" for x in out["excluded"])
     assert out["results"][0]["estimate"]["source"] == "ai"
@@ -468,10 +469,129 @@ def test_diagnose_runs_end_to_end(monkeypatch, tmp_path, fake_eatpl):
     rep = json.loads((tmp_path / "diagnose_report.json").read_text(encoding="utf-8"))
     md = (tmp_path / "diagnose_report.md").read_text(encoding="utf-8")
     assert rep["ai"][0]["status"] == "ok" and rep["ai"][0]["ids_returned"] == "5/5"
-    assert all(r["status"] == "ok" for r in rep["eatpl"]) and len(rep["eatpl"]) == 2 + 4
+    # 홍대: 원래 이름 + 실제 주소 2곳 × (전체·카페) + 술집 업종 4개
+    assert all(r["status"] == "ok" for r in rep["eatpl"]) and len(rep["eatpl"]) == 3 * 2 + 4
+    assert [r["location"] for r in rep["eatpl"][:3:2]] == ["홍대", "서울 마포구 서교동"]
     assert rep["eatpl"][0]["detail_url_ok"] == 3 and rep["eatpl"][0]["allSaleRnk"]["min"] == 5
     assert {g["status"] for g in rep["recommend"]} <= {"ok", "empty"}
     assert "sk-or-test-secret" not in md + json.dumps(rep) and "BDAI" not in md  # 키·기관명이 보고서에 없음
     bar = rep["recommend"][2]
     assert bar["top"][0]["name"] == "홍대 이자카야 하루" and bar["top"][0]["has_eatpl_link"]
     assert "2명 중 2명이 원하는 이자카야" in bar["top"][0]["reasons"] or "3명 중 2명이 원하는 이자카야" in bar["top"][0]["reasons"]
+
+
+# ---------------------------------------------------------------- 실데이터(K-Skill, 2026-11-17)에서 찾은 문제
+@pytest.mark.parametrize("name, btype, want", [
+    ("메가엠지씨커피 홍대패션거리점", "고기구이", "cafe"),      # 업종 표기 오류: 커피 체인이 '고기구이'
+    ("(주)코너펍(Corner Pub Co.)", "백반/한정식", "bar"),       # 펍이 '백반/한정식'
+    ("오늘술집주다방(홍대점)", "카페", "bar"),
+    ("이십오(25)", "유흥주점", "unknown"),                     # 모임 장소로 추천하지 않음
+    ("주식회사 인클원", "주류판매점", "unknown"),
+    ("푸주옥", "기타한식", "restaurant"),                      # 예전 표에 없던 업종
+    ("(주)라트라팡테 아오이토리", "백반/한정식", "restaurant"),
+    ("나루토", "기타일식", "restaurant"),
+    ("아임도넛 홍대점", "빵/도넛", "cafe"),
+    ("왕령관네 탕후루", "아이스크림/요거트/빙수", "cafe"),
+    ("파스타리코", "이탈리아음식", "restaurant"),
+])
+def test_category_from_real_rows(name, btype, want):
+    assert eatpl.category_of(btype, name) == want
+
+
+class RealClient:
+    """K-Skill처럼 주소 글자로 찾는 가짜 클라이언트. 받은 검색어를 기록한다."""
+    source = "kskill"
+
+    def __init__(self, fail=()):
+        self.calls, self.fail = [], set(fail)
+
+    def search(self, location, business_type=None):
+        self.calls.append((location, business_type))
+        if (location, business_type) in self.fail:
+            raise eatpl.EatplError("검색 실패")
+        rows = {
+            ("서울 마포구 서교동", "카페"): [("서교 커피", "카페", "서울 마포구 와우산로 1 (서교동)"),
+                                         ("여수 카페", "카페", "전남 여수시 서교동 1")],
+            ("서울 마포구 서교동", "빵/도넛"): [("홍대 도넛", "빵/도넛", "서울 마포구 양화로 2 (서교동)")],
+            ("서울 마포구 동교동", "카페"): [("서교 커피", "카페", "서울 마포구 와우산로 1 (서교동)"),
+                                         ("동교 카페", "카페", "서울 마포구 동교로 3 (동교동)")],
+        }.get((location, business_type), [])
+        return [eatpl.map_place({"merNm": n, "merTpbuzNm": t, "merAddr": a,
+                                 "merUrl": "https://web.paybooc.ai/mer/web/profile/" + n.replace(" ", "")})
+                for n, t, a in rows]
+
+
+def test_region_uses_real_addresses_and_cafe_subtypes():
+    from moim.recommend import search_region
+    client = RealClient()
+    places = search_region(client, "홍대", "cafe")
+    assert ("홍대", "카페") not in client.calls and ("서울 마포구 서교동", "카페") in client.calls
+    assert ("서울 마포구 서교동", "빵/도넛") in client.calls  # 베이커리·디저트 업종도 검색
+    assert [p["name"] for p in places] == ["서교 커피", "홍대 도넛", "동교 카페"]  # 중복·서울 밖 제외
+
+
+def test_region_custom_name_and_sample_unchanged(store):
+    from moim.recommend import search_region
+    client = RealClient()
+    search_region(client, "망원동", "restaurant")
+    assert client.calls == [("망원동", None)]  # 목록에 없는 지역은 입력 그대로
+    out = recommend([person("a")], eatpl.SampleClient(), store, api_key="")
+    assert out["status"] == "ok" and out["results"]  # 샘플은 지역 이름 그대로 검색
+
+
+def test_region_second_address_failure_is_skipped_but_first_is_reported(store):
+    from moim.recommend import search_region
+    ok = search_region(RealClient(fail={("서울 마포구 동교동", "카페")}), "홍대", "cafe")
+    assert [p["name"] for p in ok] == ["서교 커피", "홍대 도넛"]
+    out = recommend([person("a", place_type="cafe")], RealClient(fail={("서울 마포구 서교동", "카페")}), store, api_key="")
+    assert out["status"] == "error"
+
+
+@pytest.mark.parametrize("btype, allergen, excluded", [
+    ("횟집", "생선", True), ("빵/도넛", "밀·글루텐", True), ("아이스크림/요거트/빙수", "우유·유제품", True),
+    ("기타일식", "대두", False), ("백반/한정식", "대두", False),
+])
+def test_new_business_type_allergy_rules(btype, allergen, excluded):
+    place = {"id": "x", "name": "가게", "business_type": btype, "category": eatpl.category_of(btype)}
+    risk = estimate.rule_estimate(place, [allergen])["allergy_risk"][allergen]
+    assert (risk == "high") == excluded and risk != "unknown"
+
+
+def test_new_business_type_styles():
+    for btype, style in [("백반/한정식", "한식"), ("기타일식", "일식"), ("횟집", "일식"), ("기타중식", "중식"),
+                         ("빵/도넛", "베이커리")]:
+        place = {"id": "x", "name": "가게", "business_type": btype, "category": eatpl.category_of(btype)}
+        assert style in estimate.rule_estimate(place, [])["styles"], btype
+
+
+@pytest.mark.parametrize("raw, shown", [
+    ("주식회사 어썸레드", "어썸레드"), ("(주)라트라팡테 아오이토리", "라트라팡테 아오이토리"),
+    ("산리오러버스클럽/(주)제이콥에프앤비", "산리오러버스클럽"), ("㈜홍대베이크", "홍대베이크"),
+    ("카페 드 원피스", "카페 드 원피스"), ("주식회사", "주식회사"),
+])
+def test_clean_name(raw, shown):
+    assert eatpl.clean_name(raw) == shown
+
+
+def test_region_searches_run_in_parallel():
+    import threading, time
+    from moim.recommend import search_region
+
+    class Slow(RealClient):
+        def __init__(self):
+            super().__init__(); self.active = self.peak = 0; self.lock = threading.Lock()
+
+        def search(self, location, business_type=None):
+            with self.lock:
+                self.active += 1; self.peak = max(self.peak, self.active)
+            time.sleep(0.2)
+            try:
+                return super().search(location, business_type)
+            finally:
+                with self.lock:
+                    self.active -= 1
+
+    c = Slow(); t0 = time.perf_counter()
+    places = search_region(c, "홍대", "cafe")
+    assert len(c.calls) == 10 and c.peak > 1 and time.perf_counter() - t0 < 1.5  # 차례로면 2초
+    assert [p["name"] for p in places] == ["서교 커피", "홍대 도넛", "동교 카페"]  # 순서는 그대로

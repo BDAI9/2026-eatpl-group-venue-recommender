@@ -32,6 +32,14 @@ RESTAURANT_TYPES = {
     "버거", "스시/초밥", "떡볶이전문점", "도시락/죽", "일식돈가스", "뷔페", "마라탕", "이탈리아음식", "양꼬치",
     "아시안", "전/부침개", "일식라멘", "멕시칸", "프랑스음식", "비건/채식/사찰",
 }
+# 실데이터(2026-11-17, 홍대·성수·강남 등 1,300여 건)에서 자주 나왔는데 위 표에 없던 업종
+CAFE_TYPES |= {"기타베이커리", "빵/도넛", "아이스크림/요거트/빙수", "브런치카페/샐러드"}
+RESTAURANT_TYPES |= {"기타한식", "백반/한정식", "기타일식", "기타중식", "횟집", "샌드위치/토스트"}
+# 모임 장소로 추천하지 않는 업종 (이름이 술집 같아도 제외)
+EXCLUDED_TYPES = {"유흥주점", "클럽", "주류판매점", "무인식품점", "기타식품소매업"}
+# 업종 표기가 틀린 가게가 있어(예: 커피 체인이 '고기구이') 이름에 분명한 단서가 있으면 이름을 따른다
+_BAR_NAME = ("술집", "포차", "호프", "펍", "이자카야", "pub", "izakaya")
+_CAFE_NAME = ("커피", "카페", "까페", "coffee", "cafe", "베이커리", "bakery")
 
 
 class EatplError(Exception):
@@ -43,7 +51,14 @@ class _NoRedirect(request.HTTPRedirectHandler):
         return None
 
 
-def category_of(business_type) -> str:
+def category_of(business_type, name: str | None = None) -> str:
+    if business_type in EXCLUDED_TYPES:
+        return "unknown"
+    low = (name or "").lower()
+    if any(w in low for w in _BAR_NAME):
+        return "bar"
+    if any(w in low for w in _CAFE_NAME):
+        return "cafe"
     if business_type in CAFE_TYPES:
         return "cafe"
     if business_type in BAR_TYPES:
@@ -67,6 +82,16 @@ def safe_detail_url(value) -> str | None:
     return None
 
 
+_CORP = re.compile(r"\(주\)|㈜|\(유\)|주식회사|유한회사")
+
+
+def clean_name(name: str) -> str:
+    """가맹점 등록명을 화면용 이름으로. 예: '주식회사 어썸레드' → '어썸레드', '산리오러버스클럽/(주)제이콥' → '산리오러버스클럽'."""
+    first = name.split("/")[0]
+    cleaned = " ".join(_CORP.sub(" ", first).split())
+    return cleaned or " ".join(name.split())
+
+
 def map_place(row, *, is_sample: bool = False) -> dict | None:
     """응답의 가게 한 건을 내부 형식으로. 이름이 없거나 식별할 수 없으면 None."""
     if not isinstance(row, dict):
@@ -84,10 +109,10 @@ def map_place(row, *, is_sample: bool = False) -> dict | None:
     rank = rank if isinstance(rank, (int, float)) and not isinstance(rank, bool) else None
     return {
         "id": "eatpl:" + hashlib.sha256(identity.encode("utf-8")).hexdigest()[:20],
-        "name": name.strip(),
+        "name": clean_name(name),
         "address": address,
         "business_type": btype,
-        "category": category_of(btype),
+        "category": category_of(btype, clean_name(name)),
         "eatpl_url": None if is_sample else url,
         "sales_rank": rank,
         "open": row.get("srtTime") if isinstance(row.get("srtTime"), str) else None,
