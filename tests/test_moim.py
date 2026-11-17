@@ -124,8 +124,7 @@ def test_ai_estimates_drive_budget_and_atmosphere(monkeypatch, store):
         for p in user["가게"]:
             cheap = "분식" in p["이름"]
             items.append({"id": p["id"], "price_band": 1 if cheap else 4,
-                          "atmospheres": ["활기찬"] if cheap else ["조용한"], "styles": [],
-                          "allergy_risk": {a: "low" for a in user["요청한 알레르기"]}})
+                          "atmospheres": ["활기찬"] if cheap else ["조용한"], "styles": []})
         return json.dumps({"places": items}, ensure_ascii=False)
 
     fake_ai(monkeypatch, responder)
@@ -145,6 +144,33 @@ def test_ai_cannot_lower_rule_allergy_risk(monkeypatch, store):
     out = recommend([person("a", allergies=["생선"])], eatpl.SampleClient(), store, api_key="test")
     assert any("횟집" in x["name"] for x in out["excluded"])  # 규칙의 high가 AI의 low보다 우선
 
+
+
+def test_ai_request_omits_participant_allergies_and_names(monkeypatch):
+    captured = []
+
+    def post(api_key, model, messages, timeout=30):
+        captured.extend(messages)
+        return json.dumps({"places": [{"id": "place-1", "price_band": 2}]})
+
+    monkeypatch.setattr(estimate, "_post", post)
+    estimate.ai_estimate([{"id": "place-1", "name": "테스트 가게", "business_type": "일반한식"}],
+                         "restaurant", ["희귀 개인 알레르기"], "test")
+    sent = json.dumps(captured, ensure_ascii=False)
+    assert "희귀 개인 알레르기" not in sent
+    assert "알레르기" not in sent
+
+
+def test_cached_ai_low_does_not_hide_unknown_allergy(store):
+    place = {"id": "unknown-risk", "name": "테스트 가게", "business_type": "정보없음", "category": "restaurant"}
+    allergens = ["땅콩"]
+    store.save_estimates({place["id"]: {"price_band": 2, "atmospheres": [], "styles": [],
+                                       "allergy_risk": {"땅콩": "low"}, "source": "ai"}}, allergens)
+    estimates, _ = estimate.estimate_places([place], "restaurant", allergens, store=store, api_key="")
+    assert estimates[place["id"]]["allergy_risk"]["땅콩"] == "unknown"
+    from moim.recommend import score_place
+    score = score_place(place, estimates[place["id"]], [], "restaurant", {"땅콩": ["참여자"]})
+    assert any("알레르기 정보 없음" in caution for caution in score["cautions"])
 
 def test_ai_falls_back_through_models_then_rules(monkeypatch, store):
     from urllib import error
@@ -456,8 +482,7 @@ def test_diagnose_runs_end_to_end(monkeypatch, tmp_path, fake_eatpl):
         {"merNm": "홍대 우동집", "merAddr": "서울 마포구 홍대", "merUrl": url + "3", "merTpbuzNm": "국수/면/만두"}]})
 
     def responder(model, user):
-        return json.dumps({"places": [{"id": p["id"], "price_band": 2, "atmospheres": ["조용한"],
-                                       "allergy_risk": {a: "low" for a in user["요청한 알레르기"]}} for p in user["가게"]]})
+        return json.dumps({"places": [{"id": p["id"], "price_band": 2, "atmospheres": ["조용한"]} for p in user["가게"]]})
 
     fake_ai(monkeypatch, responder)
     monkeypatch.setattr(diagnose, "ROOT", tmp_path)

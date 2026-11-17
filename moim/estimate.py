@@ -2,8 +2,8 @@
 
 잇플 데이터에는 가격·메뉴·재료·분위기가 없다. 그래서
 1) 업종(merTpbuzNm)으로 확실히 알 수 있는 것(종류, 대표적인 알레르기 위험)은 규칙으로 정하고,
-2) 나머지(가격대, 분위기, 기타 알레르기)는 OpenRouter 무료 AI가 가게 이름·업종으로 추정한다.
-AI 추정은 틀릴 수 있으므로 화면에 'AI 추정'으로 표시한다. 알레르기는 규칙과 AI 중 더 위험한 쪽을 쓴다.
+2) 가격대와 분위기 등은 OpenRouter AI가 가게 이름·업종으로 추정한다.
+AI 추정은 틀릴 수 있으므로 화면에 'AI 추정'으로 표시한다. 알레르기는 로컬 규칙으로만 판단한다.
 """
 
 from __future__ import annotations
@@ -137,14 +137,11 @@ def rule_estimate(place: dict, allergens: list[str]) -> dict:
 
 # ---------------------------------------------------------------- AI
 _SYSTEM = """너는 음식점·카페·술집 정보를 추정하는 도우미야. 가게 이름과 업종만 보고 일반적인 경우를 추정해.
-반드시 JSON 하나로만 답해: {"places": [{"id": "...", "price_band": 1~5 또는 null, "atmospheres": [...], "styles": [...], "allergy_risk": {"알레르기": "high|medium|low|unknown"}}]}
+반드시 JSON 하나로만 답해: {"places": [{"id": "...", "price_band": 1~5 또는 null, "atmospheres": [...], "styles": [...]}]}
 - price_band: 1인 기준 1=1만원 이하, 2=1~2만원, 3=2~3만원, 4=3~5만원, 5=5만원 이상. 모르면 null.
   카페는 음료와 디저트 하나 기준이라 대부분 1이나 2야. 이름에 오마카세·파인다이닝·호텔처럼 비싼 신호가 있을 때만 높게 잡아.
 - atmospheres: 아래 목록에서만, 그럴 가능성이 높은 것 최대 3개: %s
 - styles: 아래 목록에서만, 해당하는 것: %s
-- allergy_risk: 요청한 알레르기 각각에 대해 그 업종 메뉴에 들어갈 가능성. high=대표 메뉴에 거의 들어감, medium=자주 들어감, low=거의 없음, unknown=판단 불가.
-  이름에 재료가 없으면 그 업종의 대표 메뉴로 판단해 (예: 호프=맥주·튀김이라 밀 high, 이자카야=간장·튀김이라 대두·밀 medium).
-  unknown은 업종도 이름도 단서가 전혀 없을 때만 써. 안전과 관련되므로 애매하면 low가 아니라 medium으로 답해.
 - 모든 가게의 id를 그대로 돌려줘. 설명은 쓰지 마."""
 
 
@@ -179,8 +176,8 @@ def _clean_ai(item: dict, place_type: str, allergens: list[str]) -> dict:
     band = band if isinstance(band, int) and not isinstance(band, bool) and band in BUDGETS else None
     atmos = [a for a in item.get("atmospheres") or [] if a in ATMOSPHERES][:3]
     styles = [s for s in item.get("styles") or [] if s in STYLES[place_type]]
-    raw_risk = item.get("allergy_risk") if isinstance(item.get("allergy_risk"), dict) else {}
-    risk = {a: (raw_risk.get(a) if raw_risk.get(a) in RISK else "unknown") for a in allergens}
+    # 이름과 업종만으로는 알레르기 안전성을 확인할 수 없다.
+    risk = {a: "unknown" for a in allergens}
     return {"price_band": band, "atmospheres": list(dict.fromkeys(atmos)), "styles": list(dict.fromkeys(styles)),
             "allergy_risk": risk, "source": "ai"}
 
@@ -188,8 +185,8 @@ def _clean_ai(item: dict, place_type: str, allergens: list[str]) -> dict:
 def ai_estimate(places: list[dict], place_type: str, allergens: list[str], api_key: str) -> dict:
     """AI로 추정. 모델을 순서대로 시도하고 모두 실패하면 RuntimeError(한국어 메시지)."""
     system = _SYSTEM % (", ".join(ATMOSPHERES), ", ".join(STYLES[place_type]))
-    user = json.dumps({"요청한 알레르기": allergens,
-                       "가게": [{"id": p["id"], "이름": p["name"], "업종": p.get("business_type")} for p in places]},
+    # 참여자의 건강 정보는 외부 모델에 보내지 않는다.
+    user = json.dumps({"가게": [{"id": p["id"], "이름": p["name"], "업종": p.get("business_type")} for p in places]},
                       ensure_ascii=False)
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     last = "알 수 없는 오류"
@@ -216,8 +213,9 @@ def ai_estimate(places: list[dict], place_type: str, allergens: list[str], api_k
 def _merge(rule: dict, ai: dict | None) -> dict:
     if not ai:
         return rule
-    risk = {a: max(rule["allergy_risk"].get(a, "unknown"), ai["allergy_risk"].get(a, "unknown"),
-                   key=RISK.index) for a in rule["allergy_risk"]}
+    # 과거 캐시를 포함해 AI의 안전 추정은 사용하지 않는다. 특히 low가 unknown을
+    # 덮어써 확인 필요 안내가 사라지는 일이 없도록 한다.
+    risk = dict(rule["allergy_risk"])
     styles = list(dict.fromkeys(rule["styles"] + ai["styles"]))  # 업종·이름으로 확실한 것 먼저, AI 추정을 더함
     return {"price_band": ai["price_band"], "atmospheres": ai["atmospheres"],
             "styles": styles, "allergy_risk": risk, "source": "ai"}
