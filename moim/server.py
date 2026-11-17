@@ -94,7 +94,7 @@ class App:
             if region is not None and (not isinstance(region, str) or len(region) > options.MAX_CUSTOM):
                 raise ValueError("지역을 확인해 주세요.")
             return 200, recommend(room["participants"], self.client, self.store,
-                                  region=region, place_type=place_type)
+                                  region=region, place_type=place_type, background=True)
         return 405, {"message": "지원하지 않는 요청이에요."}
 
 
