@@ -15,6 +15,14 @@ htmlcov/
 !.env.example
 .streamlit/secrets.toml
 
+# Local application state
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+diagnose_report.*
+
 # Common build and local files
 node_modules/
 dist/

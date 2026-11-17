@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>지금어디가 — 함께 고르는 모임 장소</title>
+  <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {theme: {extend: {fontFamily: {sans: ['Pretendard', 'system-ui', 'sans-serif']},
+      colors: {brand: {DEFAULT: '#bd2333', dark: '#991b28', light: '#fdf2f3', border: '#f7d4d8'}}}}};
+  </script>
+  <link rel="stylesheet" href="/frontend/css/style.css">
+</head>
+<body class="min-h-dvh w-full flex items-center justify-center sm:py-6 sm:px-4">
+  <div id="app-shell" class="w-full max-w-[440px] min-h-dvh sm:min-h-0 sm:h-[calc(100dvh-3rem)] sm:max-h-[880px] bg-white sm:rounded-[36px] sm:shadow-[0_24px_64px_-16px_rgba(24,20,18,0.22)] sm:border sm:border-black/[0.06] flex flex-col overflow-hidden relative">
+    <main id="app-root" class="flex-1 flex flex-col h-full overflow-hidden relative">
+      <p>화면을 불러오는 중이에요.</p>
+    </main>
+    <div id="app-toast" role="status" class="pointer-events-none fixed sm:absolute bottom-6 left-1/2 -translate-x-1/2 z-50 opacity-0 transition-all duration-200 translate-y-2">
+      <div id="app-toast-text" class="bg-zinc-900/95 text-white text-xs font-medium px-4 py-2.5 rounded-full shadow-lg whitespace-nowrap backdrop-blur-sm"></div>
+    </div>
+  </div>
+  <script type="module" src="/static/live-start.js"></script>
+</body>
+</html>

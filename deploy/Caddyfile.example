@@ -1,0 +1,8 @@
+# Replace with the approved public hostname after DNS points at this server.
+# Caddy must be reachable on ports 80 and 443 for automatic HTTPS.
+moim.example.com {
+    request_body {
+        max_size 16KiB
+    }
+    reverse_proxy 127.0.0.1:8000
+}
