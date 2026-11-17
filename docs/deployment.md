@@ -29,6 +29,12 @@ sudo systemctl is-active moim
 
 로컬 `.env`는 서버에 자동 복사되지 않습니다. 서버의 `/etc/moim/moim.env`에 `MOIM_ALLOWED_HOST`, `EATPL_SOURCE=kskill` 및 선택적으로 `OPENROUTER_API_KEY`를 설정합니다. 설정 파일을 채팅, Git, 로그에 남기지 않습니다. 서비스 환경 변수 변경 후에는 앱 재시작이 필요합니다.
 
+### 별도 도메인의 프론트엔드 (선택)
+
+기본값은 같은 도메인만 허용합니다. 소유를 확인한 별도 HTTPS 프론트엔드에서 API를 호출해야 할 때만 `/etc/moim/moim.env`에 `MOIM_ALLOWED_API_ORIGINS=https://frontend.example.com`처럼 정확한 출처를 명시합니다. 여러 출처는 쉼표로 구분하며, 와일드카드·포트·경로·HTTP 주소는 허용하지 않습니다. 정확히 일치하는 출처에만 실제 API 경로의 CORS를 허용하고, 쿠키·브라우저 자격 증명 공유는 허용하지 않습니다. 기존 API 서버의 `MOIM_ALLOWED_HOST`는 변경하지 않습니다.
+
+이 설정만으로 프론트엔드가 연결되지는 않습니다. 프론트엔드는 API 서버 주소를 사용해야 하며 CDN과 Nginx가 해당 API의 `OPTIONS` 및 필요한 메서드를 전달하는지 확인해야 합니다. 다른 도메인에서는 기존 브라우저의 응답 수정 토큰이 자동 이전되지 않습니다. 링크와 개인정보 노출 범위를 검토하고 실제 두 도메인에서 검증한 뒤 적용합니다.
+
 백업은 제한된 권한의 서버 디렉터리에 아래처럼 새 파일로 생성합니다. 기존 이름을 덮어쓰지 않습니다.
 
 ```bash
