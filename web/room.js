@@ -6,6 +6,46 @@ const $ = (id) => document.getElementById(id);
 let OPT = null;
 let lastRoom = null;
 
+// Keep one real form and room behind the team design's step-by-step screens.
+// A shared /r/<id> link works without relying on the creator's browser state.
+function showStep(step) {
+  document.querySelectorAll('[data-screen]').forEach((screen) => {
+    screen.hidden = Number(screen.dataset.screen) !== step;
+  });
+  document.querySelectorAll('[data-step]').forEach((button) => {
+    if (Number(button.dataset.step) === step) button.setAttribute('aria-current', 'step');
+    else button.removeAttribute('aria-current');
+  });
+  window.scrollTo(0, 0);
+}
+
+function openResults() {
+  if (!lastRoom || !lastRoom.summary.count) {
+    $('group-status').textContent = '먼저 한 명 이상 조건을 저장해 주세요.';
+    showStep(3);
+    return;
+  }
+  $('group-status').textContent = '';
+  showStep(4);
+  $('rec-button').click();
+}
+
+document.querySelectorAll('[data-step]').forEach((button) => button.addEventListener('click', () => {
+  const step = Number(button.dataset.step);
+  if (step === 4) openResults();
+  else showStep(step);
+}));
+document.querySelectorAll('[data-go]').forEach((button) => button.addEventListener('click', () => showStep(Number(button.dataset.go))));
+$('to-conditions').addEventListener('click', () => {
+  if (!checkedValues($('place-types')).length) {
+    $('place-status').textContent = '카페·식당·술집 중 하나를 골라 주세요.';
+    return;
+  }
+  $('place-status').textContent = '';
+  showStep(2);
+});
+$('to-results').addEventListener('click', openResults);
+
 function el(tag, cls, text) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -192,7 +232,8 @@ $("pref-form").addEventListener("submit", async (event) => {
     status.textContent = "저장했어요. 바꾸고 싶으면 수정 후 다시 저장하세요.";
     $("save-button").textContent = "수정 저장";
     $("leave-button").hidden = false;
-    refresh();
+    await refresh();
+    showStep(3);
   } catch (err) {
     status.textContent = err.message;
   }
@@ -302,6 +343,7 @@ $("copy-link").addEventListener("click", async () => {
     fillForm(mine);
     $("save-button").textContent = "수정 저장";
     $("leave-button").hidden = false;
+    showStep(3);
   } else if (me) {
     saveMe(null);
   }

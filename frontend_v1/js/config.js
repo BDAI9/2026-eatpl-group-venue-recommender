@@ -11,7 +11,7 @@ export const API_CONFIG = {
   POLL_REFRESH_MS: 5000,                  // 다같이 투표 진행률 자동 갱신 주기 (5초)
 };
 
-export const HOTSPOTS = ['을지로', '성수동', '강남역', '홍대입구', '종로·광화문', '여의도'];
+export const HOTSPOTS = ['을지로', '성수', '강남', '홍대', '종로', '여의도'];
 
 // Page 1 배경: 홀수 줄(1,3,5,7) 좌측 이동, 짝수 줄(2,4,6) 우측 이동
 export const EMOJI_ROWS = [
