@@ -21,6 +21,7 @@ htmlcov/
 *.sqlite3-*
 *.db
 *.db-*
+diagnose_report.*
 
 # Common build and local files
 node_modules/
