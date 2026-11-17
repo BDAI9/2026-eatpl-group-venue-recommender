@@ -12,6 +12,7 @@ REGION_ALIASES = {
     "종로·광화문": "종로", "광화문": "종로", "광화문역": "종로",
 }
 
+
 def normalize_region(value: str) -> str:
     clean = value.strip()
     return REGION_ALIASES.get(clean.replace(" ", ""), clean)
