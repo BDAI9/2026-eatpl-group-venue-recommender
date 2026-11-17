@@ -595,3 +595,10 @@ def test_region_searches_run_in_parallel():
     places = search_region(c, "홍대", "cafe")
     assert len(c.calls) == 10 and c.peak > 1 and time.perf_counter() - t0 < 1.5  # 차례로면 2초
     assert [p["name"] for p in places] == ["서교 커피", "홍대 도넛", "동교 카페"]  # 순서는 그대로
+
+
+@pytest.mark.parametrize("name", ["봉구비어 홍대산울림점", "크래프트 맥주집", "Seoul Brewery", "BEER PUB"])
+def test_beer_name_is_high_wheat_risk(name):
+    # 실데이터: 맥주집이 '기타주점'으로 등록돼 호프 규칙을 피함 → 이름으로 잡는다
+    place = {"id": "x", "name": name, "business_type": "기타주점", "category": "bar"}
+    assert estimate.rule_estimate(place, ["밀·글루텐"])["allergy_risk"]["밀·글루텐"] == "high"
