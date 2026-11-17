@@ -68,12 +68,13 @@ def test_room_flow_and_protected_token(wsgi):
 def test_landing_uses_live_room_flow_without_mock_assets(wsgi):
     landing = call(wsgi, "/")
     assert landing["status"] == 200
-    assert b'/static/live-start.js' in landing["body"]
+    assert b'/static/v2-landing.js' in landing["body"]
+    assert b'/static/v2.js' in landing["body"]
     assert b'/frontend/js/app.js' not in landing["body"]
-    script = call(wsgi, "/static/live-start.js")
+    script = call(wsgi, "/static/v2.js")
     assert script["status"] == 200
     assert b'/api/rooms' in script["body"]
-    for path in ("/static/landing.css", "/static/landing-view.js"):
+    for path in ("/static/v2.css", "/static/v2-landing.js"):
         assert call(wsgi, path)["status"] == 200
     # Prototype scripts with mock votes and links are not served.
     for path in ("/frontend/js/app.js", "/frontend/js/api.js", "/frontend/js/views.js"):
