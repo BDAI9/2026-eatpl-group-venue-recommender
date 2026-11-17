@@ -24,12 +24,9 @@ WEB = ROOT / "web"
 MAX_BODY = 16_384
 STATIC = {
     "/": ("index.html", "text/html"),
-    "/static/style.css": ("style.css", "text/css"),
-    "/static/index.js": ("index.js", "text/javascript"),
-    "/static/room.js": ("room.js", "text/javascript"),
-    "/static/live-start.js": ("live-start.js", "text/javascript"),
-    "/static/landing.css": ("landing.css", "text/css"),
-    "/static/landing-view.js": ("landing-view.js", "text/javascript"),
+    "/static/v2.css": ("v2.css", "text/css"),
+    "/static/v2-landing.js": ("v2-landing.js", "text/javascript"),
+    "/static/v2.js": ("v2.js", "text/javascript"),
 }
 ROOM_RE = re.compile(r"^/api/rooms/([A-Za-z0-9_-]{4,20})(/participants(?:/([A-Za-z0-9_-]{4,20}))?|/recommend)?$")
 
