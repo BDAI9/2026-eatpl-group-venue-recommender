@@ -83,6 +83,22 @@ def clean_name(name: str) -> str:
     return cleaned or " ".join(name.split())
 
 
+def _percentile(value) -> int | float | None:
+    """Preserve valid provider percentiles; invalid or absent means unknown."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    # The range check also rejects NaN and infinities, without converting very
+    # large integers to floats (which would itself raise OverflowError).
+    if not 0 <= value <= 100:
+        return None
+    return value
+
+
+def _flag(value) -> bool | None:
+    """Only provider booleans are meaningful; false and unknown differ."""
+    return value if isinstance(value, bool) else None
+
+
 def map_place(row, *, is_sample: bool = False) -> dict | None:
     """응답의 가게 한 건을 내부 형식으로. 이름이 없거나 식별할 수 없으면 None."""
     if not isinstance(row, dict):
@@ -106,6 +122,10 @@ def map_place(row, *, is_sample: bool = False) -> dict | None:
         "category": category_of(btype, clean_name(name)),
         "eatpl_url": None if is_sample else url,
         "sales_rank": rank,
+        "region_sales_rank": _percentile(row.get("ccgSaleRnk")),
+        "local_customer": _flag(row.get("loclPrsnPpltYn")),
+        "foreign_customer": _flag(row.get("frnrVsitYn")),
+        "group_customer": _flag(row.get("empyVsitYn")),
         "open": row.get("srtTime") if isinstance(row.get("srtTime"), str) else None,
         "close": row.get("endTime") if isinstance(row.get("endTime"), str) else None,
         "is_sample": is_sample,

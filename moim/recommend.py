@@ -17,12 +17,13 @@ from collections import Counter
 
 from .eatpl import EatplError, search_places
 from .estimate import estimate_places, pending_ai
-from .options import BUDGETS, PLACE_TYPES, REGION_QUERIES, REGIONS, normalize_region
+from .options import BUDGETS, PLACE_TYPES, REGION_QUERIES, REGIONS, SIGNALS, normalize_region
 
 TOP_N = 10
 AI_LIMIT = 12  # 실측: 무료 모델이 20곳이면 110~120초 → 화면 상위 10곳 + 여유 2곳  # 추천 한 번에 AI로 추정할 최대 가게 수 (= AI 요청 최대 1번)
 RETRY_AFTER = 300  # AI 추정이 실패하면 이 시간(초) 동안은 다시 시도하지 않는다 (무료 한도 보호)
 W_STYLE, W_BUDGET_FIT, W_BUDGET_OVER, W_ATMOS, W_MEDIUM_RISK = 3, 2, -2, 1, -2
+W_SIGNAL = 2
 
 
 def _rank_key(place: dict):
@@ -59,6 +60,7 @@ def summarize(people: list[dict]) -> dict:
         "styles": {t: dict(c.most_common()) for t, c in styles.items()},
         "budgets": {str(b): sum(1 for p in people if p.get("budget") == b) for b in BUDGETS},
         "atmospheres": dict(Counter(a for p in people for a in p["atmospheres"]).most_common()),
+        "signals": dict(Counter(s for p in people for s in p.get("signals", [])).most_common()),
         "allergies": allergens_of(people),
         "region": _winner(regions, REGIONS),
         "place_type": _winner(types, list(PLACE_TYPES)),
@@ -107,6 +109,13 @@ def score_place(place: dict, est: dict, people: list[dict], place_type: str, all
         if fans:
             score += W_ATMOS * len(fans)
             reasons.append(f"분위기 '{a}' 원하는 사람 {len(fans)}명")
+    # 제공처가 명시적으로 true로 준 방문 특성만 선호 점수에 반영한다.
+    # false/미확인은 보장이나 불리한 판정으로 바꾸지 않는다.
+    for label, field in SIGNALS.items():
+        fans = sum(label in p.get("signals", []) for p in people)
+        if fans and place.get(field) is True:
+            score += W_SIGNAL * fans
+            reasons.append(f"{fans}명이 선호한 {label} 신호")
     return {"excluded": False, "score": score, "reasons": reasons, "cautions": cautions}
 
 
