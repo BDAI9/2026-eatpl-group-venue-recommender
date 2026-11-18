@@ -44,7 +44,7 @@ def test_get_request_and_detail_url_filter(monkeypatch):
 
 @pytest.mark.parametrize(("raw", "expected"), [
     (0, 0), (0.04, 0.04), (100, 100), (-0.01, None), (100.01, None),
-    (True, None), ("1", None), (None, None), (float("inf"), None), (float("nan"), None),
+    (True, None), ("1", None), (None, None), (float("inf"), None), (float("nan"), None), (10 ** 400, None),
 ])
 def test_region_sales_percentile_only_accepts_finite_numbers_in_range(raw, expected):
     place = eatpl.map_place({"merNm": "가게", "merAddr": "서울 마포구", "ccgSaleRnk": raw})

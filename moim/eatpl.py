@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 import os
 import re
 import socket
@@ -88,7 +87,9 @@ def _percentile(value) -> int | float | None:
     """Preserve valid provider percentiles; invalid or absent means unknown."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
-    if not math.isfinite(value) or not 0 <= value <= 100:
+    # The range check also rejects NaN and infinities, without converting very
+    # large integers to floats (which would itself raise OverflowError).
+    if not 0 <= value <= 100:
         return None
     return value
 
