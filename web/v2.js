@@ -16,8 +16,13 @@ const API_ORIGIN = location.hostname === 'jj2ya.vercel.app' ? 'https://jj-moim.a
 let resultRun = 0;
 
 async function api(path, method='GET', body) {
-  const res = await fetch(API_ORIGIN + path, {method, headers: body ? {'Content-Type':'application/json'} : {},
-    body: body ? JSON.stringify(body) : undefined});
+  let res;
+  try {
+    res = await fetch(API_ORIGIN + path, {method, headers: body ? {'Content-Type':'application/json'} : {},
+      body: body ? JSON.stringify(body) : undefined});
+  } catch {
+    throw new Error('서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.');
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || '요청에 실패했어요. 다시 시도해 주세요.');
   return data;
@@ -125,7 +130,7 @@ function renderPage5() { const room=STATE.room; const people=room?.participants 
  <h3 class="text-sm font-extrabold mt-5">지금까지 모인 조건</h3><div class="mt-3 p-3.5 rounded-2xl bg-[#fdf2f3] border border-[#f4dfe1] flex flex-wrap gap-2">${summaryPills(room)}</div>
  <h3 class="text-sm font-extrabold mt-5">참여 현황</h3><p class="text-[11px] text-gray-500 mt-1">링크를 아는 사람은 참여자의 조건을 볼 수 있어요.</p><ul class="mt-3 space-y-2">${people.map(p=>`<li class="p-3 rounded-2xl border border-gray-100 text-sm"><strong>${esc(p.name)}</strong><span class="text-xs text-gray-500 ml-2">${esc(p.region)} · ${esc(STATE.options.place_types[p.place_type]||'')}</span>${(p.styles||[]).length?`<p class="text-xs text-gray-600 mt-1">${esc(p.styles.join(' · '))}</p>`:''}${(p.allergies?.length||p.allergy_other)?`<p class="text-xs text-red-700 mt-1">알레르기: ${esc([...(p.allergies||[]),p.allergy_other].filter(Boolean).join(', '))}</p>`:''}</li>`).join('') || '<li class="text-xs text-gray-500">아직 참여자가 없어요.</li>'}</ul>
  <p id="group-status" class="text-xs text-red-700 mt-3">${esc(STATE.error)}</p></div>
- <div class="mt-5 space-y-2"><button type="button" onclick="openResults()" class="w-full py-3.5 rounded-2xl bg-[#bd2333] text-white font-bold text-sm">${full?'모두의 조건으로 추천받기':'현재 조건으로 추천받기'} →</button><button type="button" onclick="editMe()" class="w-full py-3 rounded-2xl border border-gray-200 text-gray-700 font-bold text-xs">${STATE.me?'내 조건 수정':'참여하기'}</button>${STATE.me?'<button type="button" onclick="deleteMe()" class="w-full py-2 text-gray-500 text-xs underline">내 응답 삭제</button>':''}</div></div>`; }
+ <div class="mt-5 space-y-2"><button type="button" onclick="openResults()" class="w-full py-3.5 rounded-2xl bg-[#bd2333] text-white font-bold text-sm">${full?'모두의 조건으로 추천받기':'현재 조건으로 추천받기'} →</button><button type="button" onclick="editMe()" ${full&&!STATE.me?'disabled':''} class="w-full py-3 rounded-2xl border border-gray-200 text-gray-700 font-bold text-xs disabled:opacity-50">${STATE.me?'내 조건 수정':full?'참여 인원이 마감됐어요':'참여하기'}</button>${STATE.me?'<button type="button" onclick="deleteMe()" class="w-full py-2 text-gray-500 text-xs underline">내 응답 삭제</button>':''}</div></div>`; }
 function rankLabel(value, scope) {
   return typeof value==='number' && Number.isFinite(value) && value>=0 && value<=100
     ? `${scope} 결제 매출 상위 ${value}%` : '';
