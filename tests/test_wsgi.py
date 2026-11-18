@@ -70,6 +70,63 @@ def test_room_flow_and_protected_token(wsgi):
     assert call(wsgi, f"/r/{room}")["status"] == 200
 
 
+@pytest.mark.parametrize("target", [True, False, 0, 1, 31, -1, 2.0, "2", [], {}])
+def test_room_target_requires_integer_between_two_and_thirty(wsgi, target):
+    response = call(wsgi, "/api/rooms", "POST", {"title": "team", "target_size": target})
+    assert response["status"] == 400
+
+
+def test_target_room_counts_actual_participants_and_reopens_after_deletion(wsgi):
+    made = call(wsgi, "/api/rooms", "POST", {"title": "team", "target_size": 2})
+    assert made["status"] == 201
+    created = json.loads(made["body"])
+    assert created["target_size"] == 2
+    room = created["id"]
+    person = {"name": "A", "region": "홍대", "place_type": "cafe"}
+    first = json.loads(call(wsgi, f"/api/rooms/{room}/participants", "POST", person)["body"])
+    second_response = call(wsgi, f"/api/rooms/{room}/participants", "POST", {**person, "name": "B"})
+    assert second_response["status"] == 201
+    second = json.loads(second_response["body"])
+    full = call(wsgi, f"/api/rooms/{room}/participants", "POST", {**person, "name": "C"})
+    assert full["status"] == 400 and "2명" in json.loads(full["body"])["message"]
+    fetched = json.loads(call(wsgi, f"/api/rooms/{room}")["body"])
+    assert fetched["target_size"] == 2 and fetched["summary"]["count"] == 2
+    assert first["token"] not in json.dumps(fetched)
+    updated = call(wsgi, f"/api/rooms/{room}/participants/{first['id']}", "PUT",
+                   {**person, "name": "A2", "token": first["token"]})
+    assert updated["status"] == 200
+    assert call(wsgi, f"/api/rooms/{room}/participants/{second['id']}", "DELETE",
+                {"token": second["token"]})["status"] == 200
+    assert call(wsgi, f"/api/rooms/{room}/participants", "POST", {**person, "name": "C"})["status"] == 201
+
+
+def test_legacy_database_migrates_at_factory_start_without_losing_data(monkeypatch, tmp_path):
+    path = tmp_path / "legacy.sqlite3"
+    old = Store(str(path))
+    room = old.create_room("기존 모임")
+    person = {"name": "이전 사용자", "region": "홍대", "place_type": "cafe",
+              "styles": [], "budget": None, "atmospheres": [], "allergies": [], "allergy_other": None}
+    pid, token = old.add_participant(room, person)
+    with sqlite3.connect(path) as db:
+        db.execute("DROP TABLE room_settings")  # schema used by already-deployed versions
+        rooms_before = db.execute("SELECT * FROM rooms").fetchall()
+        people_before = db.execute("SELECT * FROM participants").fetchall()
+    monkeypatch.setenv("MOIM_ALLOWED_HOST", "demo.example.com")
+    monkeypatch.setenv("EATPL_SOURCE", "kskill")
+    monkeypatch.setenv("MOIM_DB_PATH", str(path))
+    app = validator(create_app())
+    fetched = json.loads(call(app, f"/api/rooms/{room}")["body"])
+    assert fetched["target_size"] is None and fetched["summary"]["count"] == 1
+    assert fetched["participants"][0]["name"] == person["name"]
+    assert call(app, f"/api/rooms/{room}/participants/{pid}", "PUT",
+                {**person, "token": token})["status"] == 200
+    with sqlite3.connect(path) as db:
+        assert db.execute("SELECT * FROM rooms").fetchall() == rooms_before
+        assert db.execute("SELECT id, room_id, token FROM participants").fetchall() == [row[:3] for row in people_before]
+        assert db.execute("SELECT COUNT(*) FROM room_settings").fetchone() == (0,)
+        assert db.execute("PRAGMA quick_check").fetchone() == ("ok",)
+
+
 def test_landing_uses_live_room_flow_without_mock_assets(wsgi):
     landing = call(wsgi, "/")
     assert landing["status"] == 200

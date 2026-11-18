@@ -44,7 +44,7 @@ def load_dotenv(path: Path = ROOT / ".env") -> None:
 
 
 def _public(room: dict) -> dict:
-    return {"id": room["id"], "title": room["title"], "participants": room["participants"],
+    return {"id": room["id"], "title": room["title"], "target_size": room["target_size"], "participants": room["participants"],
             "summary": summarize(room["participants"])}
 
 
@@ -57,12 +57,13 @@ class App:
         if method == "GET" and path == "/api/options":
             return 200, {**options.catalog(), "data_source": self.client.source}
         if method == "POST" and path == "/api/rooms":
-            if not isinstance(body, dict) or set(body) - {"title"}:
+            if not isinstance(body, dict) or set(body) - {"title", "target_size"}:
                 raise ValueError("입력 형식이 올바르지 않아요.")
             title = (body.get("title") or "").strip() or "우리 모임"
             if len(title) > 40:
                 raise ValueError("모임 이름은 40자 이내로 입력해 주세요.")
-            return 201, {"id": self.store.create_room(title)}
+            target_size = body.get("target_size")
+            return 201, {"id": self.store.create_room(title, target_size), "target_size": target_size}
 
         m = ROOM_RE.match(path)
         if not m:
