@@ -58,6 +58,33 @@ def test_validate_limits_atmospheres_and_unknown_fields():
         options.validate_preference({**person("a"), "hack": 1})
 
 
+def test_visit_signals_are_validated_and_aggregated():
+    a = person("a", signals=["동네 주민 방문", "외국인 방문", "동네 주민 방문"])
+    b = person("b", signals=["동네 주민 방문"])
+    assert a["signals"] == ["동네 주민 방문", "외국인 방문"]
+    assert summarize([a, b])["signals"] == {"동네 주민 방문": 2, "외국인 방문": 1}
+    with pytest.raises(ValueError):
+        person("a", signals=["24시간 확정"])
+    with pytest.raises(ValueError):
+        person("a", signals="동네 주민 방문")
+
+
+def test_visit_preferences_score_only_explicit_positive_data():
+    from moim.recommend import score_place
+    people = [person("a", signals=["동네 주민 방문"]), person("b", signals=["동네 주민 방문"])]
+    estimate = {"allergy_risk": {}, "styles": [], "price_band": None, "atmospheres": []}
+    positive = score_place({"local_customer": True}, estimate, people, "restaurant", {})
+    negative = score_place({"local_customer": False}, estimate, people, "restaurant", {})
+    missing = score_place({}, estimate, people, "restaurant", {})
+    assert positive["score"] > negative["score"] == missing["score"]
+    assert any("2명이 선호한 동네 주민 방문" in reason for reason in positive["reasons"])
+    assert not negative["reasons"] and not missing["reasons"]
+    # 이전 버전에서 저장된 참여자에게 새 선택 항목이 없어도 동작한다.
+    old_person = {k: v for k, v in people[0].items() if k != "signals"}
+    assert summarize([old_person])["signals"] == {}
+    assert score_place({"local_customer": True}, estimate, [old_person], "restaurant", {})["score"] == 0
+
+
 def test_custom_region_and_other_allergy_allowed():
     p = person("a", region="망원", allergy_other="키위")
     assert p["region"] == "망원" and p["allergy_other"] == "키위"

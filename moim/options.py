@@ -50,6 +50,11 @@ BUDGETS = {1: "1만원 이하", 2: "1~2만원", 3: "2~3만원", 4: "3~5만원", 
 
 ATMOSPHERES = ["조용한", "대화하기 좋은", "활기찬", "감성·인테리어", "넓은·단체석", "가성비", "뷰 좋은", "야외·테라스"]
 
+# 최근 결제 데이터의 방문 특성에 대해 우선순위를 부여하는 선택 항목.
+# 확정적인 서비스 제공 여부나 안전 조건이 아닌 선호로만 사용한다.
+SIGNALS = {"동네 주민 방문": "local_customer", "외국인 방문": "foreign_customer",
+           "직장인 방문": "group_customer"}
+
 ALLERGIES = ["갑각류(새우·게)", "조개류", "생선", "오징어", "땅콩", "견과류", "우유·유제품", "달걀",
              "밀·글루텐", "대두", "메밀", "복숭아", "토마토", "돼지고기", "소고기", "닭고기"]
 
@@ -67,6 +72,7 @@ def catalog() -> dict:
         "style_label": STYLE_LABEL,
         "budgets": {str(k): v for k, v in BUDGETS.items()},
         "atmospheres": ATMOSPHERES,
+        "signals": list(SIGNALS),
         "allergies": ALLERGIES,
     }
 
@@ -94,7 +100,7 @@ def validate_preference(payload: object) -> dict:
     """참여자 한 명의 입력을 검사하고 정리한다."""
     if not isinstance(payload, dict):
         raise ValueError("입력 형식이 올바르지 않아요.")
-    allowed = {"name", "region", "place_type", "styles", "budget", "atmospheres", "allergies", "allergy_other"}
+    allowed = {"name", "region", "place_type", "styles", "budget", "atmospheres", "signals", "allergies", "allergy_other"}
     if set(payload) - allowed:
         raise ValueError("알 수 없는 입력 항목이 있어요.")
 
@@ -108,6 +114,7 @@ def validate_preference(payload: object) -> dict:
     if budget is not None and (isinstance(budget, bool) or budget not in BUDGETS):
         raise ValueError("예산 구간을 다시 골라 주세요.")
     atmospheres = _pick_many(payload.get("atmospheres"), ATMOSPHERES, "분위기", limit=3)
+    signals = _pick_many(payload.get("signals"), SIGNALS, "방문 특성")
     allergies = _pick_many(payload.get("allergies"), ALLERGIES, "알레르기")
     other = payload.get("allergy_other")
     if other is not None and other != "":
@@ -116,4 +123,4 @@ def validate_preference(payload: object) -> dict:
         other = None
 
     return {"name": name, "region": region, "place_type": place_type, "styles": styles, "budget": budget,
-            "atmospheres": atmospheres, "allergies": allergies, "allergy_other": other}
+            "atmospheres": atmospheres, "signals": signals, "allergies": allergies, "allergy_other": other}
