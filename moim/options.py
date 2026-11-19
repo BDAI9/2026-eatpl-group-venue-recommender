@@ -13,6 +13,22 @@ REGION_ALIASES = {
 }
 
 
+_HANGUL = __import__("re").compile(r"[가-힣]")
+_REGION_CHARS = __import__("re").compile(r"[가-힣0-9·\s]+")
+
+
+def check_region_text(value: object) -> str:
+    """지역 입력의 형식만 검사하고 정리한다. 실제로 가게가 있는지는 서버가 검색으로 확인한다."""
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("지역이나 역 이름을 입력해 주세요.")
+    clean = " ".join(value.split())
+    if len(clean) > MAX_CUSTOM:
+        raise ValueError(f"지역은 {MAX_CUSTOM}자 이내로 입력해 주세요.")
+    if not _REGION_CHARS.fullmatch(clean) or len(_HANGUL.findall(clean)) < 2:
+        raise ValueError("지역은 한글로 입력해 주세요. 예: 강남, 성수동, 홍대입구역")
+    return normalize_region(clean)
+
+
 def normalize_region(value: str) -> str:
     clean = value.strip()
     return REGION_ALIASES.get(clean.replace(" ", ""), clean)
@@ -39,7 +55,8 @@ PLACE_TYPES = {"cafe": "카페", "restaurant": "식당", "bar": "술집"}
 
 # 장소 종류를 고르면 그에 맞는 '종류' 선택지가 바뀐다.
 STYLES = {
-    "cafe": ["커피 맛집", "디저트·케이크", "베이커리", "대형·뷰 카페", "공부·작업"],
+    # '공부·작업'은 뺐다: 좌석·콘센트 정보가 없어 테이크아웃 체인이 상위에 올라왔다 (회의 11/19)
+    "cafe": ["커피 맛집", "디저트·케이크", "베이커리", "대형·뷰 카페"],
     "restaurant": ["한식", "중식", "일식", "양식", "아시안", "고기·구이", "분식", "치킨·버거·피자", "채식"],
     "bar": ["호프·맥주", "이자카야", "와인·칵테일 바", "포차·소주", "전통주"],
 }
@@ -48,7 +65,9 @@ STYLE_LABEL = {"cafe": "카페 스타일", "restaurant": "먹고 싶은 음식",
 # 1인 예산 구간. 값이 클수록 비싸다.
 BUDGETS = {1: "1만원 이하", 2: "1~2만원", 3: "2~3만원", 4: "3~5만원", 5: "5만원 이상"}
 
-ATMOSPHERES = ["조용한", "대화하기 좋은", "활기찬", "감성·인테리어", "넓은·단체석", "가성비", "뷰 좋은", "야외·테라스"]
+# 업종·가격대·이름으로 어느 정도 확인할 수 있는 분위기만 남긴다 (회의 11/19: 검증 가능한 정도까지만).
+# 사진이 있어야 알 수 있는 '감성·인테리어'·'뷰 좋은'·'야외·테라스'는 뺐다.
+ATMOSPHERES = ["조용한", "대화하기 좋은", "활기찬", "넓은·단체석", "가성비"]
 
 # 최근 결제 데이터의 방문 특성에 대해 우선순위를 부여하는 선택 항목.
 # 확정적인 서비스 제공 여부나 안전 조건이 아닌 선호로만 사용한다.

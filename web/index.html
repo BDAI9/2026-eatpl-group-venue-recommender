@@ -4,6 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>지금어디가 — 함께 고르는 모임 장소</title>
+  <!-- 카카오톡 인앱 브라우저에서 열린 방문은 공모전 유입으로 집계되지 않아 기본 브라우저로 넘긴다 -->
+  <script>(function () { var ua = navigator.userAgent || ''; if (/KAKAOTALK/i.test(ua)) { location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(location.href); } })();</script>
+  <meta name="description" content="서로 다른 취향을 모아 함께 고르는 모임 장소. 링크로 각자 조건을 체크하면 카페·식당·술집을 추천해 드려요." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="지금어디가" />
+  <meta property="og:title" content="지금어디가 — 함께 고르는 모임 장소" />
+  <meta property="og:description" content="링크로 각자 조건을 체크하면 모두에게 맞는 카페·식당·술집을 추천해 드려요." />
+  <meta property="og:image" content="https://jj2ya.vercel.app/static/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" type="image/png" href="/static/icon.png" />
+  <link rel="apple-touch-icon" href="/static/icon.png" />
 
   <!-- Pretendard Font -->
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
@@ -47,7 +60,7 @@
       <!-- Top Navigation Header (Hidden on Page 1 Hero, Visible on Pages 2-6) -->
       <header id="app-header" class="hidden sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 py-3">
         <div class="flex items-center justify-between gap-2">
-          <button type="button" onclick="goBack()" aria-label="이전 단계"
+          <button id="back-btn" type="button" onclick="goBack()" aria-label="이전 단계"
             class="p-2 -ml-2 rounded-xl text-gray-600 hover:text-gray-900 hover:bg-gray-100 active:scale-95 transition flex items-center gap-1 text-sm font-semibold">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />

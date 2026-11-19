@@ -44,7 +44,7 @@ GROUPS = [
         {"name": "다", "styles": ["양식"], "budget": 2, "atmospheres": ["대화하기 좋은"], "allergies": []}]),
     ("카페 · 디저트 · 조용한", "cafe", [
         {"name": "가", "styles": ["디저트·케이크"], "budget": 2, "atmospheres": ["조용한"], "allergies": []},
-        {"name": "나", "styles": ["디저트·케이크", "커피 맛집"], "budget": 1, "atmospheres": ["감성·인테리어"], "allergies": ["견과류"]}]),
+        {"name": "나", "styles": ["디저트·케이크", "커피 맛집"], "budget": 1, "atmospheres": ["가성비"], "allergies": ["견과류"]}]),
     ("술집 · 이자카야/호프 · 밀 알레르기", "bar", [
         {"name": "가", "styles": ["이자카야"], "budget": 3, "atmospheres": ["대화하기 좋은"], "allergies": ["밀·글루텐"]},
         {"name": "나", "styles": ["호프·맥주"], "budget": 2, "atmospheres": ["활기찬"], "allergies": []},

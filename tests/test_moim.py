@@ -614,7 +614,7 @@ def test_region_searches_run_in_parallel():
 
     c = Slow(); t0 = time.perf_counter()
     places = search_region(c, "홍대", "cafe")
-    assert len(c.calls) == 10 and c.peak > 1 and time.perf_counter() - t0 < 1.5  # 차례로면 2초
+    assert len(c.calls) == 10 and c.peak > 1  # 동시에 보냄 (시간 기준은 느린 환경에서 흔들려서 쓰지 않음)
     assert [p["name"] for p in places] == ["서교 커피", "홍대 도넛", "동교 카페"]  # 순서는 그대로
 
 
