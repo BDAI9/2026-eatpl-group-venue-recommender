@@ -623,3 +623,33 @@ def test_beer_name_is_high_wheat_risk(name):
     # 실데이터: 맥주집이 '기타주점'으로 등록돼 호프 규칙을 피함 → 이름으로 잡는다
     place = {"id": "x", "name": name, "business_type": "기타주점", "category": "bar"}
     assert estimate.rule_estimate(place, ["밀·글루텐"])["allergy_risk"]["밀·글루텐"] == "high"
+
+
+# ---------------------------------------------------------------- 가격대: AI가 없어도 업종 기준으로
+def test_rule_price_covers_every_known_business_type():
+    from moim.eatpl import BAR_TYPES, CAFE_TYPES, RESTAURANT_TYPES
+    missing = [t for t in RESTAURANT_TYPES | CAFE_TYPES | BAR_TYPES if estimate.rule_price(t) is None]
+    assert missing == []
+
+
+@pytest.mark.parametrize("name, btype, band", [
+    ("김밥천국", "김밥전문점", 1), ("메가커피", "카페", 1), ("홍대 백반집", "백반/한정식", 2),
+    ("새마을식당", "고기구이", 3), ("바다 횟집", "횟집", 4),
+    ("강남 한우 오마카세", "일반한식", 5), ("을지로 와인바", "바(bar)", 4), ("이상한 업종", "알수없음", None),
+])
+def test_rule_price(name, btype, band):
+    assert estimate.rule_price(btype, name) == band
+
+
+def test_budget_works_without_ai(store):
+    # 잇플에는 가격이 없다. AI가 없어도 '가격대 정보 없음' 대신 업종 기준 가격대로 예산을 비교한다.
+    out = recommend([person("a", budget=2)], ManyClient(), store, api_key="")
+    top = out["results"][0]
+    assert "가격대 정보 없음" not in top["cautions"]
+    assert any("업종 기준 추정" in r and "예산 맞는 사람" in r for r in top["reasons"])
+
+
+def test_ai_price_wins_and_missing_ai_price_falls_back():
+    rule = estimate.rule_estimate({"id": "x", "name": "가게", "business_type": "고기구이", "category": "restaurant"}, [])
+    assert estimate._merge(rule, {"price_band": 5, "atmospheres": [], "styles": []})["price_band"] == 5
+    assert estimate._merge(rule, {"price_band": None, "atmospheres": [], "styles": []})["price_band"] == 3
