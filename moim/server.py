@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import time
 import re
 import socket
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -15,7 +16,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from . import options
-from .eatpl import make_client
+from .eatpl import EatplError, make_client
 from .recommend import recommend, summarize
 from .store import Store
 
@@ -27,6 +28,8 @@ STATIC = {
     "/static/v2.css": ("v2.css", "text/css"),
     "/static/v2-landing.js": ("v2-landing.js", "text/javascript"),
     "/static/v2.js": ("v2.js", "text/javascript"),
+    "/static/og.png": ("og.png", "image/png"),  # 카카오톡 등 링크 미리보기 썸네일
+    "/static/icon.png": ("icon.png", "image/png"),
 }
 ROOM_RE = re.compile(r"^/api/rooms/([A-Za-z0-9_-]{4,20})(/participants(?:/([A-Za-z0-9_-]{4,20}))?|/recommend)?$")
 
@@ -44,8 +47,22 @@ def load_dotenv(path: Path = ROOT / ".env") -> None:
 
 
 def _public(room: dict) -> dict:
-    return {"id": room["id"], "title": room["title"], "target_size": room["target_size"], "participants": room["participants"],
-            "summary": summarize(room["participants"])}
+    # region·place_type: 방장이 고정한 값 (예전 방은 None). 방장 토큰은 절대 내보내지 않는다.
+    return {"id": room["id"], "title": room["title"], "target_size": room["target_size"],
+            "region": room.get("region"), "place_type": room.get("place_type"),
+            "participants": room["participants"], "summary": summarize(room["participants"])}
+
+
+def _with_room_fixed(room: dict, payload):
+    """방장이 지역·업종을 정한 방이면 참여자 입력의 지역·업종을 방 값으로 맞춘다 (참여자가 바꿀 수 없음)."""
+    if not isinstance(payload, dict):
+        return payload
+    payload = dict(payload)
+    if room.get("region"):
+        payload["region"] = room["region"]
+    if room.get("place_type"):
+        payload["place_type"] = room["place_type"]
+    return payload
 
 
 class App:
@@ -56,14 +73,22 @@ class App:
     def handle(self, method: str, path: str, body):
         if method == "GET" and path == "/api/options":
             return 200, {**options.catalog(), "data_source": self.client.source}
+        if method == "POST" and path == "/api/regions/check":
+            return 200, self.check_region(body.get("region") if isinstance(body, dict) else None)
         if method == "POST" and path == "/api/rooms":
-            if not isinstance(body, dict) or set(body) - {"title", "target_size"}:
+            if not isinstance(body, dict) or set(body) - {"title", "target_size", "region", "place_type"}:
                 raise ValueError("입력 형식이 올바르지 않아요.")
             title = (body.get("title") or "").strip() or "우리 모임"
             if len(title) > 40:
                 raise ValueError("모임 이름은 40자 이내로 입력해 주세요.")
             target_size = body.get("target_size")
-            return 201, {"id": self.store.create_room(title, target_size), "target_size": target_size}
+            region = options.check_region_text(body["region"]) if body.get("region") is not None else None
+            place_type = body.get("place_type")
+            if place_type is not None and place_type not in options.PLACE_TYPES:
+                raise ValueError("카페·식당·술집 중 하나를 골라 주세요.")
+            room_id, host_token = self.store.create_hosted_room(title, target_size, region=region, place_type=place_type)
+            return 201, {"id": room_id, "target_size": target_size, "region": region, "place_type": place_type,
+                         "host_token": host_token}
 
         m = ROOM_RE.match(path)
         if not m:
@@ -75,8 +100,13 @@ class App:
 
         if sub is None and method == "GET":
             return 200, _public(room)
+        if sub is None and method == "DELETE":  # 방장만: 방과 모든 응답을 지운다
+            token = body.get("host_token") if isinstance(body, dict) else None
+            if not isinstance(token, str) or not self.store.delete_room(room_id, token):
+                return 403, {"message": "방장만 모임을 초기화할 수 있어요."}
+            return 200, {"ok": True}
         if sub == "/participants" and method == "POST":
-            data = options.validate_preference(body)
+            data = options.validate_preference(_with_room_fixed(room, body))
             new_id, token = self.store.add_participant(room_id, data)
             return 201, {"id": new_id, "token": token}
         if pid and method in ("PUT", "DELETE"):
@@ -86,17 +116,45 @@ class App:
             if method == "DELETE":
                 ok = self.store.delete_participant(room_id, pid, token)
             else:
-                data = options.validate_preference({k: v for k, v in body.items() if k != "token"})
+                data = options.validate_preference(_with_room_fixed(room, {k: v for k, v in body.items() if k != "token"}))
                 ok = self.store.update_participant(room_id, pid, token, data)
             return (200, {"ok": True}) if ok else (403, {"message": "수정 권한이 없어요."})
         if sub == "/recommend" and method == "POST":
             body = body if isinstance(body, dict) else {}
-            region, place_type = body.get("region"), body.get("place_type")
+            # 방장이 정한 지역·업종이 있으면 그 값으로만 추천한다
+            region = room.get("region") or body.get("region")
+            place_type = room.get("place_type") or body.get("place_type")
             if region is not None and (not isinstance(region, str) or len(region) > options.MAX_CUSTOM):
                 raise ValueError("지역을 확인해 주세요.")
             return 200, recommend(room["participants"], self.client, self.store,
                                   region=region, place_type=place_type, background=True)
         return 405, {"message": "지원하지 않는 요청이에요."}
+
+
+_REGION_CACHE: dict = {}
+
+
+def _check_region(self, value) -> dict:
+    """형식 검사 후 실제로 가게가 검색되는 지역인지 확인한다 (결과는 프로세스 안에 잠시 저장)."""
+    region = options.check_region_text(value)
+    if region in options.REGIONS:
+        return {"ok": True, "region": region}
+    cached = _REGION_CACHE.get(region)
+    if cached and time.time() - cached[1] < 3600:
+        found = cached[0]
+    else:
+        try:
+            found = len(self.client.search(region)) > 0
+        except EatplError:
+            # 검색 서비스 장애로 막지는 않는다 (결과 화면에서 다시 안내)
+            return {"ok": True, "region": region, "warning": "지역 확인을 하지 못했어요. 그대로 진행할게요."}
+        _REGION_CACHE[region] = (found, time.time())
+    if not found:
+        raise ValueError(f"'{region}'에서 가게를 찾지 못했어요. 동·역 이름으로 입력해 주세요. 예: 성수동, 강남역")
+    return {"ok": True, "region": region}
+
+
+App.check_region = _check_region
 
 
 def make_handler(app: App):

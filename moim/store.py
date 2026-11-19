@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS rooms (
 -- continue to read the original rooms table without destructive migration.
 CREATE TABLE IF NOT EXISTS room_settings (
     room_id TEXT PRIMARY KEY, target_size INTEGER NOT NULL CHECK (target_size BETWEEN 2 AND 30));
+-- 방장이 정한 지역·업종과 방장 권한 토큰 (방 초기화용). 예전 방에는 행이 없을 수 있다.
+CREATE TABLE IF NOT EXISTS room_meta (
+    room_id TEXT PRIMARY KEY, region TEXT, place_type TEXT, host_token TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS participants (
     id TEXT PRIMARY KEY, room_id TEXT NOT NULL, token TEXT NOT NULL,
     data TEXT NOT NULL, updated_at REAL NOT NULL);
@@ -63,15 +66,43 @@ class Store:
                 raise
         return room_id
 
+    def create_hosted_room(self, title: str, target_size: int | None = None, *,
+                           region: str | None = None, place_type: str | None = None) -> tuple[str, str]:
+        """방장이 지역·업종을 정해 만든 방. (방 id, 방장 토큰)을 돌려준다."""
+        room_id = self.create_room(title, target_size)
+        host_token = secrets.token_urlsafe(16)
+        with self._db() as db:
+            db.execute("INSERT INTO room_meta (room_id, region, place_type, host_token) VALUES (?, ?, ?, ?)",
+                       (room_id, region, place_type, host_token))
+        return room_id, host_token
+
+    def delete_room(self, room_id: str, host_token: str) -> bool:
+        """방장 토큰이 맞으면 방과 참여자 응답을 모두 지운다."""
+        with self._lock, self._db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                ok = db.execute("SELECT 1 FROM room_meta WHERE room_id = ? AND host_token = ?",
+                                (room_id, host_token)).fetchone()
+                if ok:
+                    for table, col in (("participants", "room_id"), ("room_settings", "room_id"),
+                                       ("room_meta", "room_id"), ("rooms", "id")):
+                        db.execute(f"DELETE FROM {table} WHERE {col} = ?", (room_id,))
+                db.execute("COMMIT")
+            except BaseException:
+                db.execute("ROLLBACK")
+                raise
+        return bool(ok)
+
     def get_room(self, room_id: str):
         with self._db() as db:
-            row = db.execute("SELECT r.id, r.title, s.target_size FROM rooms r "
-                             "LEFT JOIN room_settings s ON s.room_id = r.id WHERE r.id = ?", (room_id,)).fetchone()
+            row = db.execute("SELECT r.id, r.title, s.target_size, m.region, m.place_type FROM rooms r "
+                             "LEFT JOIN room_settings s ON s.room_id = r.id "
+                             "LEFT JOIN room_meta m ON m.room_id = r.id WHERE r.id = ?", (room_id,)).fetchone()
             if not row:
                 return None
             people = db.execute(
                 "SELECT id, data FROM participants WHERE room_id = ? ORDER BY updated_at", (room_id,)).fetchall()
-        return {"id": row[0], "title": row[1], "target_size": row[2],
+        return {"id": row[0], "title": row[1], "target_size": row[2], "region": row[3], "place_type": row[4],
                 "participants": [dict(json.loads(d), id=pid) for pid, d in people]}
 
     # ---- 참여자 ----
