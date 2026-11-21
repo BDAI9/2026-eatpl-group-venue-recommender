@@ -19,10 +19,31 @@ try {
   await desktop.locator('.home-shell').waitFor();
   await desktop.screenshot({ path: 'artifacts/home-desktop.png', fullPage: true });
   await desktop.close();
+  // Test narrow Android/iPhone widths as well as the default 390px layout.
+  for (const width of [320, 375, 390, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    const bounds = await page.evaluate(() => {
+      const input = document.querySelector('#location-input').getBoundingClientRect();
+      const cta = document.querySelector('.home-start').getBoundingClientRect();
+      return { viewport: window.innerWidth, scroll: document.documentElement.scrollWidth,
+        inputLeft: input.left, inputRight: input.right, ctaLeft: cta.left, ctaRight: cta.right };
+    });
+    assert.ok(bounds.scroll <= bounds.viewport + 1, `Horizontal overflow at ${width}px`);
+    assert.ok(bounds.inputLeft >= -1 && bounds.inputRight <= width + 1,
+      `Location input clipped at ${width}px`);
+    assert.ok(bounds.ctaLeft >= -1 && bounds.ctaRight <= width + 1,
+      `Primary CTA clipped at ${width}px`);
+    if (width === 320) await page.screenshot({ path: 'artifacts/home-320px.png', fullPage: true });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  const quickHongdae = page.getByRole('button', { name: '홍대', exact: true });
+  await quickHongdae.click();
+  assert.equal(await page.locator('#location-input').inputValue(), '홍대', 'Chip must update text input');
+  assert.equal(await quickHongdae.getAttribute('aria-pressed'), 'true', 'Chip must expose selected state');
+  await page.locator('#location-input').fill('성수');
+  assert.equal(await quickHongdae.getAttribute('aria-pressed'), 'false', 'Typing should clear chip state');
   await page.locator('#location-input').fill('홍대');
-  await await page.getByRole('heading', { name: /취향은 달라도/ }).waitFor();
-  const heroOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
-  assert.equal(heroOverflow, false, 'Home must not overflow mobile viewport');
+  await page.getByRole('heading', { name: /취향은 달라도/ }).waitFor();
   await page.getByRole('button', { name: /이 동네에서 시작하기/ }).click();
   await page.getByRole('heading', { name: '누가, 어떻게 고를까요?' }).waitFor();
   await page.screenshot({ path: 'artifacts/decision-mobile.png', fullPage: true });
@@ -66,6 +87,11 @@ try {
   await page.getByRole('button', { name: /모두의 조건으로 추천받기/ }).click();
   await page.getByRole('heading', { name: '어디로 갈까요?' }).waitFor();
   await page.locator('#result-status').waitFor({ timeout: 25000 });
+  await page.locator('.place-card').first().waitFor({ timeout: 30000 });
+  const disclosure = await page.locator('#result-how > summary').evaluate(
+    el => getComputedStyle(el).display
+  );
+  assert.equal(disclosure, 'list-item', 'Recommendation explanation must show disclosure marker');
   const result = await page.locator('#page-viewport').innerText();
   assert.match(result, /추천|장소/);
   await page.screenshot({ path: 'artifacts/results-mobile.png', fullPage: true });
