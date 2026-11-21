@@ -1,14 +1,8 @@
-# GatherRank — Group Preference-Aware Venue Recommendation
+# 지금어디가 — 그룹 선호 기반 장소 추천 서비스
 
-**지금어디가** · eat.pl/BC카드 데이터 기반 그룹 장소 추천 서비스
+**서로 다른 취향을 모아, 함께 만날 장소를 정하는 모임 추천 서비스**
 
-> **모임 참여자의 취향 투표를 집계하고, 장소 데이터의 근거와 안전 조건을 반영해 식당·카페·술집을 정렬하는 설명 가능한 추천 시스템.**
-
-`Python` `SQLite` `JavaScript` `K-Skill / eat.pl` `Rule-Based Ranking` `Vercel` `AWS Lightsail`
-
-누군가는 중식을, 다른 사람은 한식을 원하고 예산과 알레르기 조건도 다릅니다. GatherRank는 초대 링크로 개별 선호를 수집해 그룹 취향을 집계합니다. 식당은 음식 종류의 **최다 득표를 먼저 비교**하고, 같은 득표 수준에서 예산·분위기·방문 특성 등의 점수로 순위를 정합니다. 알레르기 고위험 신호가 확인된 후보는 제외합니다.
-
-**이름 구분:** `GatherRank`는 프로젝트/기술 포트폴리오 이름이며, 실제 이용자가 보는 서비스명은 **지금어디가**로 유지합니다. 별도 머신러닝 모델을 학습한 프로젝트는 아니며, 외부 AI는 선택적인 장소 정보 보강에 사용합니다.
+누군가는 중식을, 다른 사람은 한식을 원하고 예산과 알레르기 조건도 다릅니다. 지금어디가는 링크 하나로 구성원의 조건을 수집하고, **다수 선호와 안전 조건을 우선 반영**해 식당·카페·술집 후보를 추천합니다.
 
 [서비스 체험하기](https://jj2ya.vercel.app/) · [사용 흐름](docs/product.md) · [시스템 구조](docs/architecture.md) · [추천 알고리즘](docs/recommendation.md)
 
@@ -78,7 +72,6 @@ python -m pytest -q
 | [추천 알고리즘](docs/recommendation.md) | 투표 가중치와 예외 처리 |
 | [개발 및 협업](docs/development.md) | 로컬 테스트·브랜치·PR 규칙 |
 | [운영 배포](docs/deployment.md) | 백업, AWS/Vercel 점검, 되돌리기 |
-| [포트폴리오 요약](docs/portfolio.md) | 발표·면접용 기술 서술 |
 
 ## 프로젝트 범위와 주의사항
 
@@ -86,6 +79,5 @@ python -m pytest -q
 - 회원가입은 없고, 링크를 아는 사람은 모임 참여 조건을 볼 수 있습니다. 실사용 전 개인정보·보관 정책 검토가 필요합니다.
 - AI는 일부 정보의 **추정·보강** 역할입니다. 가격·분위기·운영시간·알레르기 안전성을 확정하지 않습니다.
 - **GitHub 병합과 AWS 반영은 별개**입니다. 운영 백엔드의 정확한 배포 커밋은 서버에서 별도로 확인해야 합니다.
-- `taste-demo/`는 실제 서비스가 아닌 [과거 Streamlit 시제품](taste-demo/README.md)입니다. `odiga_v1.pdf`는 저장소에 남아 있는 별도 PDF 파일이며, 현재 실행 코드가 아닙니다.
 
 **팀 프로젝트 저장소:** [BDAI9/2026-project-demo](https://github.com/BDAI9/2026-project-demo)

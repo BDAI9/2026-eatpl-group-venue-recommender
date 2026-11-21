@@ -34,7 +34,6 @@ flowchart TD
 | `deploy/` | 서버 실행 파일·읽기 전용 배포 점검 |
 | `tests/` | 단위·API·브라우저 검증 |
 
-`taste-demo/`는 **현재 서비스와 별개인 초기 Streamlit 시제품**입니다.
 
 ## 3. 주요 HTTP API
 
