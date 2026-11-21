@@ -9,8 +9,19 @@ page.on('pageerror', e => errors.push(e.message));
 try {
   await page.goto(base, { waitUntil: 'domcontentloaded' });
   await page.locator('#location-input').waitFor();
+  const { mkdirSync } = await import('node:fs');
+  mkdirSync('artifacts', { recursive: true });
+  await page.screenshot({ path: 'artifacts/home-mobile.png', fullPage: true });
+  const desktop = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await desktop.goto(base, { waitUntil: 'domcontentloaded' });
+  await desktop.locator('.home-shell').waitFor();
+  await desktop.screenshot({ path: 'artifacts/home-desktop.png', fullPage: true });
+  await desktop.close();
   await page.locator('#location-input').fill('홍대');
-  await page.getByRole('button', { name: /이 위치로 맛집 찾기/ }).click();
+  await await page.getByRole('heading', { name: /취향은 달라도/ }).waitFor();
+  const heroOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+  assert.equal(heroOverflow, false, 'Home must not overflow mobile viewport');
+  await page.getByRole('button', { name: /이 동네에서 시작하기/ }).click();
   await page.getByRole('heading', { name: '누가, 어떻게 고를까요?' }).waitFor();
 
   await page.getByRole('button', { name: /2명/ }).click();
@@ -51,6 +62,7 @@ try {
   await page.locator('#result-status').waitFor({ timeout: 25000 });
   const result = await page.locator('#page-viewport').innerText();
   assert.match(result, /추천|장소/);
+  await page.screenshot({ path: 'artifacts/results-mobile.png', fullPage: true });
   assert.ok(!errors.length, 'Browser JavaScript exceptions: ' + errors.join(' | '));
   console.log('OK recommendation screen after 2-person room completion');
   await guest.close();
