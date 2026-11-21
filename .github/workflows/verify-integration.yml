@@ -66,4 +66,4 @@ jobs:
         with:
           python-version: '3.11'
       - name: Check provider queries without API credentials
-        run: python -m tests.smoke_live
+        run: PYTHONPATH=. python tests/smoke_live.py
