@@ -83,3 +83,15 @@ jobs:
           python-version: '3.11'
       - name: Read-only health, CORS, and frontend preflight
         run: python deploy/check_production.py
+      - name: Verify deployed backend JS matches PR source
+        run: |
+          curl --fail --silent --show-error --location --max-time 15 \
+            https://jj-moim.amazonlightsail.com/static/v2.js \
+            --output "$RUNNER_TEMP/live-v2.js"
+          if cmp -s web/v2.js "$RUNNER_TEMP/live-v2.js"; then
+            echo "MATCH: live backend JavaScript equals current PR source"
+          else
+            echo "::error::Live backend JavaScript does NOT match current PR source"
+            echo "Do not merge until AWS code version is confirmed"
+            exit 1
+          fi
