@@ -58,9 +58,17 @@ sudo awk -F= '/^(MOIM_ALLOWED_HOST|MOIM_ALLOWED_API_ORIGINS|EATPL_SOURCE|KAKAO_J
 - `KAKAO_REST_API_KEY`: 주소 보조 검색에 선택적으로 사용; **서버 비밀값**
 - `EATPL_DETAIL_ENABLED`: 상세정보는 검증 전 **0 유지** 권장. 키를 바꿨다면 재시작 필요
 
-`KAKAO_JS_KEY`를 쓰는 경우 [Kakao Developers](https://developers.kakao.com/)에서
-웹 플랫폼 도메인 `https://jj2ya.vercel.app`을 정확히 등록해야 합니다.
+`KAKAO_JS_KEY`로 카카오톡 직접 공유를 쓰는 경우 [Kakao Developers](https://developers.kakao.com/)에서
+**다음 두 곳에 모두 `https://jj2ya.vercel.app`을 정확히 등록**해야 합니다.
+
+1. **앱 → 플랫폼 키 → JavaScript 키 → JavaScript SDK 도메인** (SDK 초기화 허용)
+2. **앱 → 제품 링크(Product Link) → 웹 도메인** (카카오톡 메시지에 포함된 링크 열기 허용)
+
+앱 관리 화면에서 발급받은 JavaScript 키만 사용하고 **REST API 키나 Admin 키를 입력하면 안 됩니다**.
 SDK 사용 여부에 관계없이 공유 링크 복사는 동작해야 합니다.
+참고: [Kakao JS SDK 시작하기](https://developers.kakao.com/docs/ko/javascript/getting-started),
+[공유 링크 도메인 설정](https://developers.kakao.com/docs/ko/app-setting/app).
+
 
 ## 2. 배포 **이전** DB 백업 (필수)
 
