@@ -35,7 +35,7 @@ for _style, _types in {
     "채식": ["비건/채식/사찰"],
     "호프·맥주": ["호프"],
     "이자카야": ["이자카야"],
-    "와인·칵테일 바": ["바(bar)"],
+    "와인·칵테일 바": ["바(bar)", "칵테일바"],
     "포차·소주": ["기타주점"],
     "베이커리": ["기타베이커리", "빵/도넛"],  # 빙수·아이스크림은 자동으로 '디저트'를 붙이지 않음 (실측: 상위가 전부 빙수집)
 }.items():
@@ -84,7 +84,6 @@ _STYLE_BY_NAME = [
     ("cafe", "디저트·케이크", ("디저트", "케이크", "케익", "마카롱", "빙수", "와플", "타르트", "dessert", "cake")),
     ("cafe", "베이커리", ("베이커리", "빵", "브레드", "베이글", "bakery", "bread")),
     ("cafe", "커피 맛집", ("로스터리", "로스터스", "로스팅", "에스프레소", "커피", "roast", "coffee", "espresso")),
-    ("cafe", "공부·작업", ("스터디", "북카페", "study")),
     ("bar", "와인·칵테일 바", ("와인", "칵테일", "위스키", "wine", "cocktail", "whisky")),
     ("bar", "이자카야", ("이자카야", "izakaya", "사케")),
     ("bar", "포차·소주", ("포차", "포장마차", "소주")),
@@ -132,8 +131,52 @@ def rule_estimate(place: dict, allergens: list[str]) -> dict:
     for allergen, words in _ALLERGY_BY_NAME:
         if _name_has(name, words):
             risks[allergen] = "high"
-    return {"price_band": None, "atmospheres": [], "styles": styles,
+    price = rule_price(btype, name)
+    return {"price_band": price, "atmospheres": rule_atmospheres(btype, name, price), "styles": styles,
             "allergy_risk": {a: risks.get(a, "unknown") for a in allergens}, "source": "rule"}
+
+
+# 잇플 응답에는 가격이 없어서, AI 추정이 없을 때(첫 화면·AI 한도 초과·상위 12곳 밖) 쓰는 업종별 기본 가격대.
+# 1인 기준 1=1만원 이하, 2=1~2만원, 3=2~3만원, 4=3~5만원, 5=5만원 이상. AI 추정이 있으면 AI 값을 쓴다.
+_PRICE_BY_TYPE = {}
+for _band, _types in {
+    1: ["카페", "기타베이커리", "빵/도넛", "아이스크림/요거트/빙수", "김밥전문점", "분식", "떡볶이전문점",
+        "도시락/죽", "버거", "샌드위치/토스트"],
+    2: ["브런치카페/샐러드", "일반한식", "기타한식", "백반/한정식", "국수/면/만두", "찜/탕/찌개", "전/부침개",
+        "중국음식", "기타중식", "마라탕", "일식라멘", "일식돈가스", "기타일식", "아시안", "멕시칸", "기타외국식",
+        "치킨", "피자", "비건/채식/사찰", "호프"],
+    3: ["고기구이", "갈비전문점", "곱창전골/구이", "족발/보쌈", "양꼬치", "해산물구이/찜", "스시/초밥",
+        "이탈리아음식", "서양음식", "한정식", "뷔페", "이자카야", "기타주점", "주점", "바(bar)", "칵테일바"],
+    4: ["일식회집", "횟집", "프랑스음식"],
+}.items():
+    for _t in _types:
+        _PRICE_BY_TYPE[_t] = _band
+_PRICE_BY_NAME = [(5, ("오마카세", "파인다이닝", "호텔", "omakase")), (4, ("한우", "코스", "와인", "스테이크"))]
+
+
+# 업종·가격대·이름으로 근거를 댈 수 있는 분위기만 규칙으로 붙인다. '조용한'·'대화하기 좋은'은 AI 추정에 맡긴다.
+_ATMOS_BY_TYPE = {
+    "활기찬": {"호프", "기타주점", "주점", "고기구이", "곱창전골/구이", "치킨", "양꼬치"},
+    "넓은·단체석": {"뷔페", "갈비전문점", "한정식", "백반/한정식"},
+}
+_ATMOS_BY_NAME = [("활기찬", ("포차", "펍", "pub", "호프")), ("넓은·단체석", ("단체", "연회", "뷔페"))]
+
+
+def rule_atmospheres(business_type, name: str = "", price: int | None = None) -> list[str]:
+    out = [a for a, types in _ATMOS_BY_TYPE.items() if business_type in types]
+    out += [a for a, words in _ATMOS_BY_NAME if a not in out and _name_has(name or "", words)]
+    if price == 1:
+        out.append("가성비")  # 업종 기준 1인 1만원 이하
+    return [a for a in out if a in ATMOSPHERES][:3]
+
+
+def rule_price(business_type, name: str = "") -> int | None:
+    band = _PRICE_BY_TYPE.get(business_type)
+    for at_least, words in _PRICE_BY_NAME:
+        if band is not None and _name_has(name or "", words):
+            band = max(band, at_least)
+            break
+    return band
 
 
 # ---------------------------------------------------------------- AI
@@ -218,7 +261,9 @@ def _merge(rule: dict, ai: dict | None) -> dict:
     # 덮어써 확인 필요 안내가 사라지는 일이 없도록 한다.
     risk = dict(rule["allergy_risk"])
     styles = list(dict.fromkeys(rule["styles"] + ai["styles"]))  # 업종·이름으로 확실한 것 먼저, AI 추정을 더함
-    return {"price_band": ai["price_band"], "atmospheres": ai["atmospheres"],
+    price = ai["price_band"] if ai.get("price_band") is not None else rule.get("price_band")
+    atmos = list(dict.fromkeys(rule["atmospheres"] + ai["atmospheres"]))[:3]  # 근거 있는 규칙 먼저
+    return {"price_band": price, "atmospheres": atmos,
             "styles": styles, "allergy_risk": risk, "source": "ai"}
 
 

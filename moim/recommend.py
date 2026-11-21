@@ -100,7 +100,8 @@ def score_place(place: dict, est: dict, people: list[dict], place_type: str, all
         fit = [p for p in budget_people if band <= p["budget"]]
         over = [p for p in budget_people if band > p["budget"] + 1]
         score += W_BUDGET_FIT * len(fit) + W_BUDGET_OVER * len(over)
-        reasons.append(f"1인 {BUDGETS[band]} 추정 · 예산 맞는 사람 {len(fit)}/{len(budget_people)}")
+        how = "업종 기준 추정" if est.get("source") == "rule" else "추정"
+        reasons.append(f"1인 {BUDGETS[band]} {how} · 예산 맞는 사람 {len(fit)}/{len(budget_people)}")
     elif budget_people:
         cautions.append("가격대 정보 없음")
     # 분위기

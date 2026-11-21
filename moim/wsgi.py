@@ -57,14 +57,14 @@ def _api_methods(path: str) -> tuple[str, ...]:
     """Return methods actually handled by App for a specific API route."""
     if path == "/api/options":
         return ("GET",)
-    if path == "/api/rooms":
+    if path in ("/api/rooms", "/api/regions/check"):
         return ("POST",)
     match = ROOM_RE.fullmatch(path)
     if not match:
         return ()
     _, sub, participant_id = match.groups()
     if sub is None:
-        return ("GET",)
+        return ("GET", "DELETE")
     if sub == "/participants":
         return ("POST",)
     if participant_id:
