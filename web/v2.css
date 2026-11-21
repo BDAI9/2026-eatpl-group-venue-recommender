@@ -42,7 +42,7 @@ button:disabled { cursor: not-allowed; }
 .home-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .home-brand { display: inline-flex; gap: 8px; align-items: center; color: var(--ink); font-size: 15px; font-weight: 750; letter-spacing: -.035em; white-space: nowrap; }
 .home-brand-mark { color: var(--brand); font-size: 12px; line-height: 1; }
-.home-source { color: #827b77; font-size: 11px; line-height: 1.4; white-space: nowrap; }
+.home-source { color: #827b77; font-size: 12px; line-height: 1.4; white-space: nowrap; }
 .home-intro { margin-top: clamp(26px, 6vh, 48px); text-align: left; }
 .home-illustration { height: 126px; width: 100%; margin: 0 auto 18px; }
 .home-illustration svg { display: block; width: 100%; height: 100%; }
