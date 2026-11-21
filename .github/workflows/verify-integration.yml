@@ -57,6 +57,14 @@ jobs:
       - name: Print server logs on failure
         if: failure()
         run: cat "${RUNNER_TEMP}/moim-smoke.log" || true
+      - name: Attach mobile and desktop UI snapshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-snapshots-${{ github.run_id }}
+          path: artifacts/*.png
+          if-no-files-found: ignore
+          retention-days: 7
 
   external-api-smoke:
     runs-on: ubuntu-latest
