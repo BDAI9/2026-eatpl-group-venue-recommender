@@ -1,4 +1,4 @@
-# MeetRank — Group Preference-Aware Venue Recommendation
+# GatherRank — Group Preference-Aware Venue Recommendation
 
 **지금어디가** · eat.pl/BC카드 데이터 기반 그룹 장소 추천 서비스
 
@@ -6,9 +6,9 @@
 
 `Python` `SQLite` `JavaScript` `K-Skill / eat.pl` `Rule-Based Ranking` `Vercel` `AWS Lightsail`
 
-누군가는 중식을, 다른 사람은 한식을 원하고 예산과 알레르기 조건도 다릅니다. MeetRank는 초대 링크로 개별 선호를 수집해 그룹 취향을 집계합니다. 식당은 음식 종류의 **최다 득표를 먼저 비교**하고, 같은 득표 수준에서 예산·분위기·방문 특성 등의 점수로 순위를 정합니다. 알레르기 고위험 신호가 확인된 후보는 제외합니다.
+누군가는 중식을, 다른 사람은 한식을 원하고 예산과 알레르기 조건도 다릅니다. GatherRank는 초대 링크로 개별 선호를 수집해 그룹 취향을 집계합니다. 식당은 음식 종류의 **최다 득표를 먼저 비교**하고, 같은 득표 수준에서 예산·분위기·방문 특성 등의 점수로 순위를 정합니다. 알레르기 고위험 신호가 확인된 후보는 제외합니다.
 
-**이름 구분:** `MeetRank`는 프로젝트/기술 포트폴리오 이름이며, 실제 이용자가 보는 서비스명은 **지금어디가**로 유지합니다. 별도 머신러닝 모델을 학습한 프로젝트는 아니며, 외부 AI는 선택적인 장소 정보 보강에 사용합니다.
+**이름 구분:** `GatherRank`는 프로젝트/기술 포트폴리오 이름이며, 실제 이용자가 보는 서비스명은 **지금어디가**로 유지합니다. 별도 머신러닝 모델을 학습한 프로젝트는 아니며, 외부 AI는 선택적인 장소 정보 보강에 사용합니다.
 
 [서비스 체험하기](https://jj2ya.vercel.app/) · [사용 흐름](docs/product.md) · [시스템 구조](docs/architecture.md) · [추천 알고리즘](docs/recommendation.md)
 

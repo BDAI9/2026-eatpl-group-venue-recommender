@@ -1,4 +1,4 @@
-# MeetRank · Group Preference-Aware Venue Recommendation
+# GatherRank · Group Preference-Aware Venue Recommendation
 
 > 팀 전체의 구현을 설명한 문서입니다. 개인 GitHub/이력서에는 **자신이 실제 담당한 PR과 근거**만 골라 적으세요.
 
