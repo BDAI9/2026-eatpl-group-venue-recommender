@@ -177,7 +177,7 @@ function checkbox(label, name, selected, disableUnselected=false) {
 function renderPage2() { return `<div class="flex-1 flex flex-col justify-between p-5 page-enter"><div>
  <div class="inline-flex px-3 py-1 rounded-lg bg-gray-100 text-gray-600 text-xs font-semibold mb-3">📍 ${esc(STATE.location)}</div>
  <h2 class="text-2xl font-bold text-gray-900">누가, 어떻게 고를까요?</h2><p class="text-xs text-gray-500 mt-2">혼자 고르거나 링크를 공유해 함께 선택할 수 있어요.</p>
- <div class="grid grid-cols-2 gap-2 p-1.5 bg-gray-100 rounded-2xl mt-5" role="group" aria-label="결정 방식">${[['solo','🙋 나 혼자 결정','조건 선택 시 바로 결정'],['group','🗳️ 다같이 선택','링크 공유 · 참여 현황']].map(([id,title,desc])=>`<button type="button" onclick="setMode('${id}')" aria-pressed="${STATE.decisionMode===id}" class="py-3 rounded-xl text-sm font-bold ${STATE.decisionMode===id?'bg-white text-[#a9283b] shadow-sm':'text-gray-500'}">${title}<span class="block text-xs font-medium mt-1">${desc}</span></button>`).join('')}</div>
+ <div class="grid grid-cols-2 gap-2 p-1.5 bg-gray-100 rounded-2xl mt-5" role="group" aria-label="결정 방식">${[['solo','혼자 결정','조건 선택 후 바로 추천'],['group','함께 결정','링크 공유 · 함께 선택']].map(([id,title,desc])=>`<button type="button" onclick="setMode('${id}')" aria-pressed="${STATE.decisionMode===id}" class="py-3 rounded-xl text-sm font-bold ${STATE.decisionMode===id?'bg-white text-[#a9283b] shadow-sm':'text-gray-500'}">${title}<span class="block text-xs font-medium mt-1">${desc}</span></button>`).join('')}</div>
  ${STATE.decisionMode==='solo' ? `
  <div class="flex items-center justify-between mt-6 mb-3"><p class="text-sm font-bold text-gray-700">동행 유형</p><span class="text-xs font-semibold text-[#a9283b]">1개 선택</span></div>
  <div class="space-y-2" role="group" aria-label="동행 유형">${COMPANIONS.map(item=>`<button type="button" onclick="setCompanion('${item.id}')" aria-pressed="${STATE.companion===item.id}" class="w-full flex items-center gap-3 p-4 text-left rounded-2xl border-2 ${STATE.companion===item.id?'border-[#a9283b] bg-[#fdf2f3]':'border-gray-100 bg-white'}"><span class="w-11 h-11 flex items-center justify-center rounded-xl bg-gray-50 text-xs font-bold text-gray-600 shrink-0">${item.icon}</span><span class="flex-1"><strong class="block text-sm">${esc(item.title)}</strong><span class="block text-xs text-gray-500 mt-1">${esc(item.desc)}</span></span><span aria-hidden="true" class="text-[#a9283b] font-bold">${STATE.companion===item.id?'●':'○'}</span></button>`).join('')}</div>
@@ -199,7 +199,7 @@ const PAGE3_STYLE_LABELS = {
 function renderStyleButton(style) {
  const selected=STATE.styles.includes(style);
  const label=PAGE3_STYLE_LABELS[style] ?? style;
- return `<button type="button" data-value="${esc(style)}" onclick="toggleStyle(this)" aria-pressed="${selected}" class="px-3.5 py-3 rounded-xl border-2 text-left text-xs font-semibold ${selected?'bg-[#a9283b] text-white border-[#a9283b]':'border-gray-100 text-gray-700'}">${esc(label)} <span class="float-right" aria-hidden="true">${selected?'✓':'선택'}</span></button>`;
+ return `<button type="button" data-value="${esc(style)}" onclick="toggleStyle(this)" aria-pressed="${selected}" class="px-3.5 py-3 rounded-xl border-2 text-left text-xs font-semibold ${selected?'bg-[#a9283b] text-white border-[#a9283b]':'border-gray-100 text-gray-700'}">${esc(label)} <span class="float-right" aria-hidden="true">${selected?'✓':''}</span></button>`;
 }
 function renderPage3() { const fixed=fixedType(); if(fixed) STATE.placeType=fixed;
  const types=Object.entries(STATE.options.place_types).filter(([id])=>!fixed || id===fixed);
