@@ -4,6 +4,7 @@ import { chromium } from 'playwright';
 const base = 'http://127.0.0.1:8765';
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+await page.emulateMedia({ reducedMotion: 'reduce' });
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));
 try {
@@ -13,6 +14,7 @@ try {
   mkdirSync('artifacts', { recursive: true });
   await page.screenshot({ path: 'artifacts/home-mobile.png', fullPage: true });
   const desktop = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await desktop.emulateMedia({ reducedMotion: 'reduce' });
   await desktop.goto(base, { waitUntil: 'domcontentloaded' });
   await desktop.locator('.home-shell').waitFor();
   await desktop.screenshot({ path: 'artifacts/home-desktop.png', fullPage: true });
