@@ -36,6 +36,19 @@ W_SIGNAL = 2
 W_VEGETARIAN = 1
 
 
+def _cuisine_priority(est: dict, votes: dict[str, int], place_type: str) -> int:
+    """식당은 가장 많이 선택된 음식 종류부터. 예산·랭킹은 같은 득표 안에서 비교한다.
+
+    선택되지 않은 종류는 0점, 복수 종류를 가진 매장은 가장 높은 일치 득표를 사용한다.
+    중복 선택을 모두 더하지 않아서 '복수 분류 매장'의 불공정한 이득을 막는다.
+    """
+    if place_type != "restaurant" or not votes:
+        return 0
+    cuisines = set(STYLES[place_type])
+    return max((votes.get(tag, 0) for tag in canonical_styles(place_type, est.get("styles", []))
+                if tag in cuisines), default=0)
+
+
 def _rank_key(place: dict):
     """동점일 때 순서: 잇플 매출 순위값이 작은 곳 먼저(값이 없으면 뒤), 그다음 이름."""
     rank = place.get("sales_rank")
@@ -359,6 +372,8 @@ def recommend(people: list[dict], client, store=None, *, region: str | None = No
 
     allergy_people = summary["allergies"]
     allergens = list(allergy_people)
+    cuisine_votes = {style: count for style, count in summary["styles"][place_type].items()
+                     if style in STYLES[place_type] and count > 0}
     # 1차: 규칙(+저장된 AI 추정)으로 점수 → 유력 후보부터 AI에 보낸다. 규칙상 위험 '높음'은 AI가 낮출 수 없으니 보내지 않는다.
     estimate_store = None if use_details else store
     first, _ = estimate_places(places, place_type, allergens, store=estimate_store, api_key="", ai_limit=0)
@@ -367,7 +382,10 @@ def recommend(people: list[dict], client, store=None, *, region: str | None = No
         s = score_place(p, first[p["id"]], people, place_type, allergy_people)
         if not s["excluded"]:
             prelim.append((s["score"], p))
-    prelim.sort(key=lambda x: (-x[0], _rank_key(x[1])))
+    prelim.sort(key=lambda x: (
+        -_cuisine_priority(first[x[1]["id"]], cuisine_votes, place_type),
+        -x[0], _rank_key(x[1])
+    ))
     ordered = [p for _, p in prelim]
     key_ = api_key if api_key is not None else os.getenv("OPENROUTER_API_KEY", "").strip()
     out["ai_pending"] = False
@@ -415,9 +433,21 @@ def recommend(people: list[dict], client, store=None, *, region: str | None = No
         scored.append({**p, "estimate": est, **{k: s[k] for k in ("score", "reasons", "cautions")}})
     wants_dessert = place_type == "cafe" and DESSERT_STYLE in summary["styles"]["cafe"]
     scored.sort(key=lambda p: (
-        wants_dessert and not p["estimate"].get("dessert_items"), -p["score"], _rank_key(p)
+        wants_dessert and not p["estimate"].get("dessert_items"),
+        -_cuisine_priority(p["estimate"], cuisine_votes, place_type),
+        -p["score"], _rank_key(p)
     ))
     out["results"] = scored[:TOP_N]
+    if (place_type == "restaurant" and scored and cuisine_votes
+            and not (out["details_pending"] or out["ai_pending"])):
+        most_votes = max(cuisine_votes.values())
+        preferred = {style for style, votes in cuisine_votes.items() if votes == most_votes}
+        if not any(preferred.intersection(p["estimate"]["styles"]) for p in scored):
+            labels = ", ".join(tag for tag in STYLES[place_type] if tag in preferred)
+            warnings.append(
+                f"가장 많이 선택한 {labels} 매장을 확인하지 못해 다른 선호 종류로 추천했어요. "
+                "알레르기·지역 또는 매장 분류 정보를 확인해 주세요."
+            )
     if (use_details and scored and wants_dessert
             and not any(p["estimate"].get("dessert_items") for p in scored)
             and not (out["details_pending"] or out["ai_pending"])):
