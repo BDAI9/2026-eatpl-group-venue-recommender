@@ -32,8 +32,8 @@
           },
           colors: {
             brand: {
-              DEFAULT: '#bd2333',
-              dark: '#9e1b29',
+              DEFAULT: '#a9283b',
+              dark: '#8f2032',
               light: '#fdf2f3',
               soft: '#fce8ea',
             }
@@ -46,7 +46,7 @@
   <!-- Custom Styles & Keyframe Animations -->
   <link rel="stylesheet" href="/static/v2.css" />
 </head>
-<body class="min-h-screen flex flex-col bg-[#f8f9fa] text-gray-900 selection:bg-[#bd2333]/15 selection:text-[#bd2333]">
+<body class="min-h-screen flex flex-col bg-[#f8f7f5] text-gray-900 selection:bg-[#a9283b]/15 selection:text-[#a9283b]">
 
   <!-- Non-blocking Toast Banner (Replaces alert/confirm) -->
   <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-2 w-full max-w-sm px-4"></div>
@@ -55,7 +55,7 @@
   <div class="flex-1 w-full max-w-6xl mx-auto flex flex-col lg:flex-row lg:items-start lg:justify-center lg:gap-8 lg:py-6 lg:px-6">
 
     <!-- Mobile-First Primary App Shell -->
-    <main id="app-shell" class="w-full max-w-md mx-auto lg:mx-0 bg-white min-h-screen lg:min-h-[780px] lg:rounded-3xl lg:shadow-xl lg:border lg:border-gray-200/80 flex flex-col relative overflow-hidden">
+    <main id="app-shell" class="w-full max-w-md mx-auto lg:mx-0 bg-white min-h-screen lg:min-h-[780px] lg:rounded-3xl lg:shadow-sm lg:border lg:border-gray-200/80 flex flex-col relative overflow-hidden">
 
       <!-- Top Navigation Header (Hidden on Page 1 Hero, Visible on Pages 2-6) -->
       <header id="app-header" class="hidden sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 py-3">
@@ -70,7 +70,7 @@
 
           <!-- Brand Logo Button (Resets to Page 1) -->
           <button type="button" onclick="resetToStart()" class="flex items-center gap-1.5 group">
-            <span class="w-7 h-7 rounded-lg bg-[#bd2333] flex items-center justify-center shadow-sm group-hover:scale-105 transition">
+            <span class="w-7 h-7 rounded-lg bg-[#a9283b] flex items-center justify-center shadow-sm group-hover:scale-105 transition">
               <!-- Custom Rice-Bowl SVG Icon -->
               <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none">
                 <path d="M7 5.5C7 4.5 7.8 4 7.8 3M12 5C12 4 12.8 3.5 12.8 2.5M17 5.5C17 4.5 17.8 4 17.8 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
@@ -83,14 +83,14 @@
           </button>
 
           <!-- Step Indicator Pill -->
-          <div id="step-badge" class="px-2.5 py-1 rounded-full bg-[#fdf2f3] text-[#bd2333] text-xs font-bold">
+          <div id="step-badge" class="px-2.5 py-1 rounded-full bg-[#fdf2f3] text-[#a9283b] text-xs font-bold">
             2 / 6
           </div>
         </div>
 
         <!-- Progress Bar -->
         <div class="w-full h-1.5 bg-gray-100 rounded-full mt-2.5 overflow-hidden">
-          <div id="progress-bar" class="h-full bg-[#bd2333] rounded-full transition-all duration-300" style="width: 33%;"></div>
+          <div id="progress-bar" class="h-full bg-[#a9283b] rounded-full transition-all duration-300" style="width: 33%;"></div>
         </div>
       </header>
 
