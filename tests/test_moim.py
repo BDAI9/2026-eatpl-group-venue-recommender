@@ -139,6 +139,59 @@ def test_allergy_high_risk_excluded_and_popular_style_first(store):
     assert "한식 2명" in out["results"][0]["reasons"]
 
 
+def _cuisine_client_places(monkeypatch, places):
+    """실제 외부 API 없이 득표수와 안전 제외를 종단 간 검증한다."""
+    monkeypatch.setattr("moim.recommend.search_region",
+                        lambda client, region, place_type, **kwargs: places)
+
+
+def _restaurant_place(pid, name, business_type, *, local=False, rank=10):
+    return {"id": pid, "name": name, "address": "서울 마포구 서교동",
+            "category": "restaurant", "business_type": business_type,
+            "sales_rank": rank, "local_customer": local}
+
+
+def test_majority_chinese_priority_over_budget_signals_and_sales(monkeypatch, store):
+    # 예산·동네 맛집·매출이 한식을 밀어도, 중식 2표가 한식 1표보다 먼저다.
+    places = [
+        _restaurant_place("k", "한식 도시락", "도시락/죽", local=True, rank=1),
+        _restaurant_place("c", "중식 식당", "중국음식", rank=99),
+    ]
+    _cuisine_client_places(monkeypatch, places)
+    people = [person("a", styles=["중식"]), person("b", styles=["중식"]),
+              person("c", styles=["한식"], budget=1, signals=["동네 맛집"])]
+    out = recommend(people, eatpl.SampleClient(), store, api_key="")
+    assert out["status"] == "ok"
+    assert out["summary"]["styles"]["restaurant"] == {"중식": 2, "한식": 1}
+    assert out["results"][0]["id"] == "c"
+    assert "중식 2명" in out["results"][0]["reasons"]
+
+
+def test_majority_cuisine_never_overrides_high_allergen_exclusion(monkeypatch, store):
+    places = [
+        _restaurant_place("c", "새우 중식 식당", "중국음식", rank=1),
+        _restaurant_place("k", "한식 도시락", "도시락/죽", rank=99),
+    ]
+    _cuisine_client_places(monkeypatch, places)
+    people = [person("a", styles=["중식"], allergies=["갑각류(새우·게)"]),
+              person("b", styles=["중식"]), person("c", styles=["한식"])]
+    out = recommend(people, eatpl.SampleClient(), store, api_key="")
+    assert [p["id"] for p in out["results"]] == ["k"]
+    assert out["excluded"][0]["name"] == "새우 중식 식당"
+    assert any("가장 많이 선택한 중식" in warning for warning in out["warnings"])
+
+
+def test_cuisine_tie_uses_other_preferences_and_sales(monkeypatch, store):
+    places = [
+        _restaurant_place("c", "중식 식당", "중국음식", rank=50),
+        _restaurant_place("k", "한식 도시락", "도시락/죽", rank=1),
+    ]
+    _cuisine_client_places(monkeypatch, places)
+    people = [person("a", styles=["중식"]), person("b", styles=["한식"])]
+    out = recommend(people, eatpl.SampleClient(), store, api_key="")
+    assert out["results"][0]["id"] == "k"  # 같은 한 표면 매출 순위로 결정
+
+
 def test_override_region_and_type(store):
     out = recommend([person("a")], eatpl.SampleClient(), store, region="성수", place_type="cafe")
     assert out["region"] == "성수" and out["place_type"] == "cafe"
