@@ -25,4 +25,4 @@
 
 - [PR #28의 당시 릴리스 체크리스트](release-28.md) — 당시 이력 보존용
 - [초기 Streamlit 시제품](../taste-demo/README.md) — 별도 프로토타입
-- [기존 시연 PDF](../odiga_v1.pdf) — 과거 산출물
+- [별도 PDF 자료](../odiga_v1.pdf) — 현재 실행 코드와 무관한 저장소 파일

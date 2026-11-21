@@ -80,6 +80,6 @@ python -m pytest -q
 - 회원가입은 없고, 링크를 아는 사람은 모임 참여 조건을 볼 수 있습니다. 실사용 전 개인정보·보관 정책 검토가 필요합니다.
 - AI는 일부 정보의 **추정·보강** 역할입니다. 가격·분위기·운영시간·알레르기 안전성을 확정하지 않습니다.
 - **GitHub 병합과 AWS 반영은 별개**입니다. 운영 백엔드의 정확한 배포 커밋은 서버에서 별도로 확인해야 합니다.
-- `taste-demo/`는 실제 서비스가 아닌 [과거 Streamlit 시제품](taste-demo/README.md)입니다. `odiga_v1.pdf`도 이전 제출·시연 자료로, 현재 실행 코드가 아닙니다.
+- `taste-demo/`는 실제 서비스가 아닌 [과거 Streamlit 시제품](taste-demo/README.md)입니다. `odiga_v1.pdf`는 저장소에 남아 있는 별도 PDF 파일이며, 현재 실행 코드가 아닙니다.
 
 **팀 프로젝트 저장소:** [BDAI9/2026-project-demo](https://github.com/BDAI9/2026-project-demo)
