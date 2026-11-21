@@ -440,7 +440,7 @@ function renderApp({quiet=false}={}) { const header=$('app-header'); header.clas
  if(quiet) {
    viewport.querySelector('.page-enter')?.classList.remove('page-enter');
    if(focusedId) $(focusedId)?.focus({preventScroll:true});
-   if(scrollY!==null) window.scrollTo({top:scrollY,behavior:'instant'});
+   if(scrollY!==null) window.scrollTo(0, scrollY);
  }
  const modal=$('reset-dialog'); if(modal) modal.showModal();
  const form=$('conditions-form'); if(form) form.addEventListener('submit',submitConditions);
