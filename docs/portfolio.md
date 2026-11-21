@@ -1,6 +1,8 @@
-# 지금어디가 · 발표·포트폴리오 요약
+# MeetRank · Group Preference-Aware Venue Recommendation
 
 > 팀 전체의 구현을 설명한 문서입니다. 개인 GitHub/이력서에는 **자신이 실제 담당한 PR과 근거**만 골라 적으세요.
+
+**사용자 서비스명:** 지금어디가 · **데이터:** K-Skill 경유 eat.pl/BC카드 · **추천:** 규칙 기반 그룹 선호 정렬
 
 ## 30초 소개
 
