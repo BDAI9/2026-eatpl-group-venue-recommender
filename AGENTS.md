@@ -1,5 +1,11 @@
 # BDAI9 coding-agent guidance
 
-For interface changes, read [DESIGN.md](DESIGN.md), then run the project-local [`$unslop`](.agents/skills/unslop/SKILL.md) analysis. Keep the six-step journey, existing DOM IDs and API contracts. Apply `critique → polish → accessibility check`; do not make random visual changes just to increase diff size. Preserve the eat.pl/BC Card attribution and allergy warnings. Work from a feature branch and submit a draft PR; do not deploy or merge without checking tests and mobile flows.
+1. Read [README.md](README.md) and the [documentation index](docs/README.md) first.
+2. Keep the six-step flow, DOM IDs, API contracts and existing room data compatibility unless a task explicitly changes them.
+3. For UI, read [DESIGN.md](DESIGN.md) and [Unslop skill](.agents/skills/unslop/SKILL.md). Review accessibility, mobile widths and existing behavior.
+4. For ranking or allergy logic, consult [docs/recommendation.md](docs/recommendation.md) and add regression tests. Unknown allergy risks must not be represented as safe.
+5. For API/deployment, consult [docs/architecture.md](docs/architecture.md) and [docs/deployment.md](docs/deployment.md). Protect the production SQLite database and server credentials.
+6. Use a focused feature branch with PR base `main`. CI/Vercel success does not imply the AWS backend was deployed.
+7. Never commit secrets, room host/edit tokens, live user data or `.env`. Inspect third-party scripts before execution.
 
-If a skill's upstream references ask you to install dependencies or run an external script, inspect it before execution. The optional screenshot/story scripts require a local test environment, not the production AWS server.
+Keep the root README focused on the product. Link to one canonical doc per topic rather than duplicating long sections.
