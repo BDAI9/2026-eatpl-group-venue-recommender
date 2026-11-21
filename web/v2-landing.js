@@ -32,9 +32,9 @@ function renderPage1() {
       <div class="relative z-10 pt-7 px-5 flex items-center justify-between">
         <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#fdf2f3] border border-[#bd2333]/15 text-[#bd2333] text-xs font-bold shadow-xs">
           <span class="w-1.5 h-1.5 rounded-full bg-[#bd2333]"></span>
-          함께 고르는 모임 장소
+          함께 고르는 카페 · 식당 · 술집
         </span>
-        <span class="text-[11px] font-semibold text-gray-400">카페 · 식당 · 술집</span>
+        <span class="text-[11px] font-semibold text-gray-400"> eat.pl · BC카드 기반 서비스</span>
       </div>
 
       <!-- Centered Brand Hero & Location Search Bar -->
@@ -75,7 +75,7 @@ function renderPage1() {
               value="${esc(STATE.location)}"
               placeholder="어디에서 먹을까요?"
               oninput="handleLocationInput(this.value)"
-              onkeydown="if(event.key==='Enter') submitPage1()"
+              onkeydown="if(event.key==='Enter' && !event.isComposing) submitPage1()"
               class="w-full pl-11 pr-20 py-3.5 rounded-2xl bg-gray-50 border border-gray-200 focus:bg-white focus:border-[#bd2333] focus:ring-2 focus:ring-[#bd2333]/15 text-sm font-semibold text-gray-900 placeholder-gray-400 outline-none transition"
             />
 
@@ -95,10 +95,12 @@ function renderPage1() {
 
           </div>
 
+          <div id="region-choices" class="mt-2" aria-live="polite"></div>
+
           <!-- Quick District Chips -->
           <div class="mt-3">
             <div class="flex items-center justify-between px-1 mb-1.5">
-              <span class="text-[11px] font-semibold text-gray-400">인기 상권 빠른 선택</span>
+              <span class="text-[11px] font-semibold text-gray-400">인기 상권 빠르게 선택하기</span>
 
             </div>
             <div class="flex flex-wrap gap-1.5">
@@ -127,7 +129,7 @@ function renderPage1() {
             onclick="submitPage1()"
             class="w-full mt-4 py-3.5 rounded-2xl bg-[#bd2333] hover:bg-[#9e1b29] active:scale-[0.99] text-white font-bold text-sm shadow-md shadow-[#bd2333]/25 transition flex items-center justify-center gap-1.5"
           >
-            <span>이 위치로 맛집 찾기 시작</span>
+            <span>이 위치로 맛집 찾기</span>
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
             </svg>
@@ -138,7 +140,7 @@ function renderPage1() {
       <!-- Bottom Footer -->
       <div class="relative z-10 pb-5 px-5 text-center">
         <p class="text-[11px] font-medium text-gray-400">
-          함께 고르는 모임 장소
+          JJ2YA · 함께 고르는 맛집 - 지금 어디가
         </p>
       </div>
     </div>

@@ -594,6 +594,33 @@
    "allSaleRnk": 43,
    "srtTime": "11:00",
    "endTime": "23:00"
+  },
+  {
+   "merNm": "홍대 브런치 카페 (가상)",
+   "merAddr": "서울 마포구 홍대입구 일대 67번지 (시연용 가상 주소)",
+   "merUrl": null,
+   "merTpbuzNm": "브런치카페/샐러드",
+   "allSaleRnk": 67,
+   "srtTime": "10:00",
+   "endTime": "19:00"
+  },
+  {
+   "merNm": "성수 브런치 카페 (가상)",
+   "merAddr": "서울 성동구 성수역 일대 68번지 (시연용 가상 주소)",
+   "merUrl": null,
+   "merTpbuzNm": "브런치카페/샐러드",
+   "allSaleRnk": 68,
+   "srtTime": "10:00",
+   "endTime": "19:00"
+  },
+  {
+   "merNm": "강남 브런치 카페 (가상)",
+   "merAddr": "서울 강남구 강남역 일대 69번지 (시연용 가상 주소)",
+   "merUrl": null,
+   "merTpbuzNm": "브런치카페/샐러드",
+   "allSaleRnk": 69,
+   "srtTime": "10:00",
+   "endTime": "19:00"
   }
  ]
 }

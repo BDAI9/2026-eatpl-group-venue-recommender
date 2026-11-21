@@ -1,0 +1,97 @@
+name: Verify Codex integration
+
+on:
+  push:
+    branches:
+      - integration/codex-clean26
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install test dependency
+        run: python -m pip install pytest
+      - name: Syntax-check Python modules
+        run: python -m compileall -q moim
+      - name: Run tests
+        run: python -m pytest -q
+      - name: Compile deployment preflight
+        run: python -m py_compile deploy/check_production.py
+      - name: Syntax-check JavaScript
+        run: |
+          node --check web/v2.js
+          node --check web/v2-landing.js
+          node --check tests/ui_smoke.mjs
+
+  ui-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chromium browser and Playwright
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Run isolated local room and invitation flow
+        env:
+          EATPL_SOURCE: sample
+          OPENROUTER_API_KEY: ''
+        run: |
+          python -m moim --port 8765 --db "${RUNNER_TEMP}/ui-smoke.sqlite3" > "${RUNNER_TEMP}/moim-smoke.log" 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8765/api/options >/dev/null; then break; fi
+            sleep 1
+          done
+          node tests/ui_smoke.mjs
+      - name: Print server logs on failure
+        if: failure()
+        run: cat "${RUNNER_TEMP}/moim-smoke.log" || true
+
+  external-api-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check provider queries without API credentials
+        run: PYTHONPATH=. python tests/smoke_live.py
+
+  production-readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    # This reads the PREVIOUS live deployment. It is advisory and never
+    # creates rooms or turns a CI-green preview into a production claim.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Read-only health, CORS, and frontend preflight
+        run: python deploy/check_production.py
+      - name: Verify deployed backend JS matches PR source
+        run: |
+          curl --fail --silent --show-error --location --max-time 15 \
+            https://jj-moim.amazonlightsail.com/static/v2.js \
+            --output "$RUNNER_TEMP/live-v2.js"
+          if cmp -s web/v2.js "$RUNNER_TEMP/live-v2.js"; then
+            echo "MATCH: live backend JavaScript equals current PR source"
+          else
+            echo "::error::Live backend JavaScript does NOT match current PR source"
+            echo "Do not merge until AWS code version is confirmed"
+            exit 1
+          fi

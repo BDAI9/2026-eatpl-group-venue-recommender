@@ -18,7 +18,9 @@ from urllib.parse import urlsplit
 from . import options
 from .eatpl import EatplError, make_client
 from .recommend import recommend, summarize
-from .store import Store
+from .regions import address_candidates, canonical_area, find_region_places
+from .stations import StationLookupError, find_stations, require_station, station_input, station_search_variant
+from .store import RoomNotFound, Store
 
 ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "web"
@@ -48,9 +50,13 @@ def load_dotenv(path: Path = ROOT / ".env") -> None:
 
 def _public(room: dict) -> dict:
     # region·place_type: 방장이 고정한 값 (예전 방은 None). 방장 토큰은 절대 내보내지 않는다.
+    people = [{**p, "styles": options.canonical_styles(p["place_type"], p["styles"]),
+               "atmospheres": options.canonical_atmospheres(p.get("atmospheres", []), p["place_type"]),
+               "signals": options.canonical_signals(p.get("signals", []))}
+              for p in room["participants"]]
     return {"id": room["id"], "title": room["title"], "target_size": room["target_size"],
             "region": room.get("region"), "place_type": room.get("place_type"),
-            "participants": room["participants"], "summary": summarize(room["participants"])}
+            "participants": people, "summary": summarize(people)}
 
 
 def _with_room_fixed(room: dict, payload):
@@ -72,7 +78,8 @@ class App:
 
     def handle(self, method: str, path: str, body):
         if method == "GET" and path == "/api/options":
-            return 200, {**options.catalog(), "data_source": self.client.source}
+            return 200, {**options.catalog(), "data_source": self.client.source,
+                         "kakao_js_key": os.getenv("KAKAO_JS_KEY", "").strip()}
         if method == "POST" and path == "/api/regions/check":
             return 200, self.check_region(body.get("region") if isinstance(body, dict) else None)
         if method == "POST" and path == "/api/rooms":
@@ -82,7 +89,15 @@ class App:
             if len(title) > 40:
                 raise ValueError("모임 이름은 40자 이내로 입력해 주세요.")
             target_size = body.get("target_size")
-            region = options.check_region_text(body["region"]) if body.get("region") is not None else None
+            value = body.get("region")
+            station = station_input(value)
+            text = station.replace(".", "·") if station and self.client.source == "kskill" else value
+            region = options.check_region_text(text) if text is not None else None
+            if station and self.client.source == "kskill":
+                try:
+                    region = require_station(station).label
+                except StationLookupError as exc:
+                    raise ValueError(str(exc)) from exc
             place_type = body.get("place_type")
             if place_type is not None and place_type not in options.PLACE_TYPES:
                 raise ValueError("카페·식당·술집 중 하나를 골라 주세요.")
@@ -107,7 +122,10 @@ class App:
             return 200, {"ok": True}
         if sub == "/participants" and method == "POST":
             data = options.validate_preference(_with_room_fixed(room, body))
-            new_id, token = self.store.add_participant(room_id, data)
+            try:
+                new_id, token = self.store.add_participant(room_id, data)
+            except RoomNotFound as exc:
+                return 404, {"message": str(exc)}
             return 201, {"id": new_id, "token": token}
         if pid and method in ("PUT", "DELETE"):
             token = body.get("token") if isinstance(body, dict) else None
@@ -120,6 +138,9 @@ class App:
                 ok = self.store.update_participant(room_id, pid, token, data)
             return (200, {"ok": True}) if ok else (403, {"message": "수정 권한이 없어요."})
         if sub == "/recommend" and method == "POST":
+            target = room["target_size"]
+            if target is not None and len(room["participants"]) < target:
+                return 409, {"message": f"{target}명이 모두 참여하면 추천을 볼 수 있어요."}
             body = body if isinstance(body, dict) else {}
             # 방장이 정한 지역·업종이 있으면 그 값으로만 추천한다
             region = room.get("region") or body.get("region")
@@ -127,31 +148,93 @@ class App:
             if region is not None and (not isinstance(region, str) or len(region) > options.MAX_CUSTOM):
                 raise ValueError("지역을 확인해 주세요.")
             return 200, recommend(room["participants"], self.client, self.store,
-                                  region=region, place_type=place_type, background=True)
+                                  region=region, place_type=place_type, party_size=target, background=True)
         return 405, {"message": "지원하지 않는 요청이에요."}
 
 
 _REGION_CACHE: dict = {}
 
 
+def _station_region(query: str, *, required: bool = False, confirm: bool = False) -> dict | None:
+    try:
+        matches = find_stations(query)
+    except StationLookupError as exc:
+        if required:
+            raise ValueError(str(exc)) from exc
+        return None
+    if not matches:
+        if required:
+            raise ValueError(f"'{query}' 지하철역을 찾지 못했어요. 시·군·구와 역 이름을 확인해 주세요.")
+        return None
+    if len(matches) > 1:
+        return {"ok": False, "candidates": [match.label for match in matches],
+                "message": "같은 이름의 역이 여러 곳이에요. 어느 역인가요?"}
+    if confirm:
+        return {"ok": False, "candidates": [matches[0].label],
+                "message": "비슷한 이름의 역을 찾았어요. 찾으시던 역을 선택해 주세요."}
+    return {"ok": True, "region": matches[0].label}
+
+
 def _check_region(self, value) -> dict:
     """형식 검사 후 실제로 가게가 검색되는 지역인지 확인한다 (결과는 프로세스 안에 잠시 저장)."""
-    region = options.check_region_text(value)
-    if region in options.REGIONS:
+    try:
+        station = station_input(value)
+        region = options.check_region_text(station.replace(".", "·") if station and self.client.source == "kskill" else value)
+    except ValueError:
+        choices = options.region_suggestions(value)
+        if choices:
+            if self.client.source == "kskill" and len(choices) == 1:
+                corrected = station_search_variant(choices[0], correct_spelling=True)
+                if corrected:
+                    candidate = _station_region(corrected, confirm=True)
+                    if candidate:
+                        return candidate
+            return {"ok": False, "candidates": choices, "message": "찾으시던 지역을 선택해 주세요."}
+        raise
+    if station and self.client.source == "kskill":
+        return _station_region(station, required=True)
+    if region in options.REGION_QUERIES:
         return {"ok": True, "region": region}
-    cached = _REGION_CACHE.get(region)
+    if station and self.client.source == "sample":
+        raise ValueError("샘플 모드는 실제 역 주변을 검색할 수 없어요. 인기 상권을 고르거나 K-Skill 모드로 실행해 주세요.")
+    cache_key = (self.client.source, region)
+    cached = _REGION_CACHE.get(cache_key)
+    search_delayed = False
     if cached and time.time() - cached[1] < 3600:
-        found = cached[0]
+        places = cached[0]
     else:
         try:
-            found = len(self.client.search(region)) > 0
+            places = find_region_places(region, self.client.search)
         except EatplError:
-            # 검색 서비스 장애로 막지는 않는다 (결과 화면에서 다시 안내)
-            return {"ok": True, "region": region, "warning": "지역 확인을 하지 못했어요. 그대로 진행할게요."}
-        _REGION_CACHE[region] = (found, time.time())
-    if not found:
+            places = []
+            search_delayed = True
+        else:
+            if len(_REGION_CACHE) >= 512:
+                _REGION_CACHE.pop(next(iter(_REGION_CACHE), None), None)
+            _REGION_CACHE[cache_key] = (places, time.time())
+
+    matches = address_candidates(region, places)
+    if len(matches) > 1:
+        return {"ok": False, "candidates": matches, "message": "같은 이름의 지역이 여러 곳이에요. 어느 지역인가요?"}
+    if matches:
+        return {"ok": True, "region": matches[0]}
+    if self.client.source == "kskill":
+        query = station_search_variant(region)
+        if query:
+            result = _station_region(query)
+            if result:
+                return result
+        corrected = station_search_variant(region, correct_spelling=True)
+        if corrected:
+            result = _station_region(corrected, confirm=True)
+            if result:
+                return result
+    if search_delayed:
+        return {"ok": True, "region": region,
+                "warning": "잇플 조회가 지연되고 있어요. 가게는 추천 화면에서 다시 확인해요."}
+    if not places:
         raise ValueError(f"'{region}'에서 가게를 찾지 못했어요. 동·역 이름으로 입력해 주세요. 예: 성수동, 강남역")
-    return {"ok": True, "region": region}
+    return {"ok": True, "region": canonical_area(region)}
 
 
 App.check_region = _check_region

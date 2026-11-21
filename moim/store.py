@@ -34,6 +34,10 @@ CREATE TABLE IF NOT EXISTS estimates (
 """
 
 
+class RoomNotFound(ValueError):
+    """The room no longer exists when a participant tries to join."""
+
+
 class Store:
     def __init__(self, path: str = "moim.sqlite3"):
         self.path = path
@@ -51,6 +55,10 @@ class Store:
 
     # ---- 방 ----
     def create_room(self, title: str, target_size: int | None = None) -> str:
+        return self._create_room(title, target_size)
+
+    def _create_room(self, title: str, target_size: int | None, *, host_token: str | None = None,
+                     region: str | None = None, place_type: str | None = None) -> str:
         if target_size is not None and (type(target_size) is not int or not 2 <= target_size <= MAX_PARTICIPANTS):
             raise ValueError(f"모임 인원은 2명부터 {MAX_PARTICIPANTS}명까지 선택해 주세요.")
         room_id = secrets.token_urlsafe(6)
@@ -60,6 +68,9 @@ class Store:
                 db.execute("INSERT INTO rooms (id, title, created_at) VALUES (?, ?, ?)", (room_id, title, time.time()))
                 if target_size is not None:
                     db.execute("INSERT INTO room_settings (room_id, target_size) VALUES (?, ?)", (room_id, target_size))
+                if host_token is not None:
+                    db.execute("INSERT INTO room_meta (room_id, region, place_type, host_token) VALUES (?, ?, ?, ?)",
+                               (room_id, region, place_type, host_token))
                 db.execute("COMMIT")
             except BaseException:
                 db.execute("ROLLBACK")
@@ -69,11 +80,8 @@ class Store:
     def create_hosted_room(self, title: str, target_size: int | None = None, *,
                            region: str | None = None, place_type: str | None = None) -> tuple[str, str]:
         """방장이 지역·업종을 정해 만든 방. (방 id, 방장 토큰)을 돌려준다."""
-        room_id = self.create_room(title, target_size)
         host_token = secrets.token_urlsafe(16)
-        with self._db() as db:
-            db.execute("INSERT INTO room_meta (room_id, region, place_type, host_token) VALUES (?, ?, ?, ?)",
-                       (room_id, region, place_type, host_token))
+        room_id = self._create_room(title, target_size, host_token=host_token, region=region, place_type=place_type)
         return room_id, host_token
 
     def delete_room(self, room_id: str, host_token: str) -> bool:
@@ -112,6 +120,8 @@ class Store:
             # instances, so two simultaneous joins cannot exceed capacity.
             db.execute("BEGIN IMMEDIATE")
             try:
+                if db.execute("SELECT 1 FROM rooms WHERE id = ?", (room_id,)).fetchone() is None:
+                    raise RoomNotFound("모임을 찾을 수 없어요. 링크를 확인해 주세요.")
                 setting = db.execute("SELECT target_size FROM room_settings WHERE room_id = ?", (room_id,)).fetchone()
                 limit = setting[0] if setting else MAX_PARTICIPANTS
                 count = db.execute("SELECT COUNT(*) FROM participants WHERE room_id = ?", (room_id,)).fetchone()[0]

@@ -52,12 +52,18 @@ def backup_database(source: str | Path, destination: str | Path) -> None:
         if os.name == "posix":
             os.chmod(temporary, 0o600)
         with closing(sqlite3.connect(src.as_uri() + "?mode=ro", uri=True, timeout=10)) as original:
-            tables = {row[0] for row in original.execute(
-                "SELECT name FROM sqlite_master WHERE type = 'table'")}
-            if not _TABLES <= tables:
-                raise BackupError("원본이 모임 앱 DB인지 확인해 주세요.")
             with closing(sqlite3.connect(str(temporary), timeout=10)) as snapshot:
-                original.backup(snapshot)
+                # SQLite's online backup manages its own consistent read
+                # snapshot while writers are active. Querying sqlite_master
+                # on the *source* first can fail with SQLITE_BUSY under
+                # sustained concurrent writes, before backup even starts.
+                original.backup(snapshot, pages=128, sleep=0.05)
+                # Inspect the private snapshot instead of contending with
+                # live room writes while validating the database schema.
+                tables = {row[0] for row in snapshot.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'")}
+                if not _TABLES <= tables:
+                    raise BackupError("원본이 모임 앱 DB인지 확인해 주세요.")
                 if snapshot.execute("PRAGMA quick_check").fetchone() != ("ok",):
                     raise BackupError("백업 무결성을 확인하지 못했습니다.")
         # Atomic exclusive creation: link never replaces a concurrently created

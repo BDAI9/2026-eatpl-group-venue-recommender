@@ -15,6 +15,7 @@ KSKILL_URL = "https://k-skill-proxy.nomadamas.org/v1/bccard-eatpl/search"
 SAMPLE_PATH = Path(__file__).resolve().parent / "data" / "sample_places.json"
 MAX_BYTES = 2_000_000
 
+BRUNCH_BUSINESS_TYPE = "브런치카페/샐러드"
 CAFE_TYPES = {"카페"}
 BAR_TYPES = {"기타주점", "호프", "이자카야", "바(bar)", "주점", "칵테일바"}
 RESTAURANT_TYPES = {
@@ -24,7 +25,7 @@ RESTAURANT_TYPES = {
     "아시안", "전/부침개", "일식라멘", "멕시칸", "프랑스음식", "비건/채식/사찰",
 }
 # 실데이터(2026-11-17, 홍대·성수·강남 등 1,300여 건)에서 자주 나왔는데 위 표에 없던 업종
-CAFE_TYPES |= {"기타베이커리", "빵/도넛", "아이스크림/요거트/빙수", "브런치카페/샐러드"}
+CAFE_TYPES |= {"기타베이커리", "빵/도넛", "아이스크림/요거트/빙수", BRUNCH_BUSINESS_TYPE}
 RESTAURANT_TYPES |= {"기타한식", "백반/한정식", "기타일식", "기타중식", "횟집", "샌드위치/토스트"}
 # 모임 장소로 추천하지 않는 업종 (이름이 술집 같아도 제외)
 EXCLUDED_TYPES = {"유흥주점", "클럽", "주류판매점", "무인식품점", "기타식품소매업"}
@@ -45,6 +46,8 @@ class _NoRedirect(request.HTTPRedirectHandler):
 def category_of(business_type, name: str | None = None) -> str:
     if business_type in EXCLUDED_TYPES:
         return "unknown"
+    if business_type == BRUNCH_BUSINESS_TYPE:
+        return "cafe"
     low = (name or "").lower()
     if any(w in low for w in _BAR_NAME):
         return "bar"
@@ -99,6 +102,16 @@ def _flag(value) -> bool | None:
     return value if isinstance(value, bool) else None
 
 
+def _tm128_point(row) -> tuple[float, float] | None:
+    try:
+        x, y = float(row.get("xaxsVal")), float(row.get("yaxsVal"))
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if 0 < x < 1_000_000 and 0 < y < 1_000_000:
+        return x, y
+    return None
+
+
 def map_place(row, *, is_sample: bool = False) -> dict | None:
     """응답의 가게 한 건을 내부 형식으로. 이름이 없거나 식별할 수 없으면 None."""
     if not isinstance(row, dict):
@@ -129,6 +142,7 @@ def map_place(row, *, is_sample: bool = False) -> dict | None:
         "open": row.get("srtTime") if isinstance(row.get("srtTime"), str) else None,
         "close": row.get("endTime") if isinstance(row.get("endTime"), str) else None,
         "is_sample": is_sample,
+        "tm128": None if is_sample else _tm128_point(row),
     }
 
 
@@ -208,14 +222,25 @@ def make_client(store):
     raise ValueError("지원하지 않는 장소 데이터 원천이에요. kskill 또는 sample을 사용해 주세요.")
 
 
-def search_places(client, region: str, place_type: str) -> list[dict]:
+def evidence_category(place: dict) -> str:
+    business = place.get("business_type")
+    if business in EXCLUDED_TYPES:
+        return "unknown"
+    official = category_of(business)
+    guessed = place["category"]
+    if official != "unknown" and guessed == official:
+        return official
+    return "unknown"
+
+
+def search_places(client, region: str, place_type: str, *, include_unknown: bool = False) -> list[dict]:
     """지역과 장소 종류로 후보를 모은다.
 
     실제 술집 검색은 제공처의 대분류 둘로 조회하고 응답 소분류로 다시 거른다.
     업종 체계가 일치하지 않거나 응답 건수에 제한이 있어 완전한 목록은 아니다.
     """
     seen, out = set(), []
-    if place_type == "cafe":
+    if place_type == "cafe" and client.source != "sample":
         calls = [("카페",)]
     elif place_type == "bar" and client.source == "kskill":
         calls = [("주점",), ("칵테일바",)]
@@ -223,7 +248,11 @@ def search_places(client, region: str, place_type: str) -> list[dict]:
         calls = [(None,)]
     for (btype,) in calls:
         for p in client.search(region, btype):
-            if p["category"] == place_type and p["id"] not in seen:
+            category = evidence_category(p) if include_unknown else p["category"]
+            eligible = category == place_type or (
+                include_unknown and category == "unknown" and p.get("business_type") not in EXCLUDED_TYPES
+            )
+            if eligible and p["id"] not in seen:
                 seen.add(p["id"])
                 out.append(p)
     return out
