@@ -1,0 +1,29 @@
+name: Verify Codex integration
+
+on:
+  push:
+    branches:
+      - integration/codex-clean26
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install test dependency
+        run: python -m pip install pytest
+      - name: Syntax-check Python modules
+        run: python -m compileall -q moim
+      - name: Run tests
+        run: python -m pytest -q
+      - name: Syntax-check JavaScript
+        run: |
+          node --check web/v2.js
+          node --check web/v2-landing.js

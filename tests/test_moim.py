@@ -59,10 +59,10 @@ def test_validate_limits_atmospheres_and_unknown_fields():
 
 
 def test_visit_signals_are_validated_and_aggregated():
-    a = person("a", signals=["동네 주민 방문", "외국인 방문", "동네 주민 방문"])
-    b = person("b", signals=["동네 주민 방문"])
-    assert a["signals"] == ["동네 주민 방문", "외국인 방문"]
-    assert summarize([a, b])["signals"] == {"동네 주민 방문": 2, "외국인 방문": 1}
+    a = person("a", signals=["동네 주민 방문", "외국인 맛집", "동네 맛집"])
+    b = {**person("b"), "signals": ["동네 주민 방문", "직장인 방문"]}
+    assert a["signals"] == ["동네 맛집", "외국인 맛집"]
+    assert summarize([a, b])["signals"] == {"동네 맛집": 2, "외국인 맛집": 1, "직장인 맛집": 1}
     with pytest.raises(ValueError):
         person("a", signals=["24시간 확정"])
     with pytest.raises(ValueError):
@@ -71,13 +71,13 @@ def test_visit_signals_are_validated_and_aggregated():
 
 def test_visit_preferences_score_only_explicit_positive_data():
     from moim.recommend import score_place
-    people = [person("a", signals=["동네 주민 방문"]), person("b", signals=["동네 주민 방문"])]
+    people = [person("a", signals=["동네 맛집"]), {**person("b"), "signals": ["동네 주민 방문"]}]
     estimate = {"allergy_risk": {}, "styles": [], "price_band": None, "atmospheres": []}
     positive = score_place({"local_customer": True}, estimate, people, "restaurant", {})
     negative = score_place({"local_customer": False}, estimate, people, "restaurant", {})
     missing = score_place({}, estimate, people, "restaurant", {})
     assert positive["score"] > negative["score"] == missing["score"]
-    assert any("2명이 선호한 동네 주민 방문" in reason for reason in positive["reasons"])
+    assert any("2명이 선호한 동네 맛집" in reason for reason in positive["reasons"])
     assert not negative["reasons"] and not missing["reasons"]
     # 이전 버전에서 저장된 참여자에게 새 선택 항목이 없어도 동작한다.
     old_person = {k: v for k, v in people[0].items() if k != "signals"}
@@ -91,7 +91,7 @@ def test_custom_region_and_other_allergy_allowed():
 
 
 @pytest.mark.parametrize(("entered", "expected"), [
-    ("홍대입구역", "홍대"), ("강남역", "강남"), ("성수동", "성수"),
+    ("홍대입구역", "홍대"), ("강남역", "강남"), ("성수동", "성수동"),
     ("종로 · 광화문", "종로"), ("광화문역", "종로"),
     ("성수역", "성수"), ("망원동", "망원동"),
 ])
@@ -105,6 +105,19 @@ def test_votes_pick_region_and_type():
                    person("d")])
     assert s["region"] == "홍대" and s["place_type"] == "restaurant"
     assert s["allergies"] == {}
+
+
+def test_any_style_votes_count_toward_each_selected_cuisine():
+    people = [person("a", styles=["한식", "일식"]), person("b", styles=["일식", "중식"]),
+              person("c", styles=["채식"]), person("d", place_type="cafe")]
+    styles = summarize(people)["styles"]
+    assert styles["restaurant"] == {"한식": 2, "일식": 3, "중식": 2, "채식": 1}
+    assert styles["cafe"] == {"아무거나": 1}
+    assert styles["bar"] == {}
+
+
+def test_all_any_style_votes_have_their_own_count():
+    assert summarize([person(name) for name in ("a", "b", "c")])["styles"]["restaurant"] == {"아무거나": 3}
 
 
 def test_allergies_collected_with_names():
@@ -123,7 +136,7 @@ def test_allergy_high_risk_excluded_and_popular_style_first(store):
     assert any("횟집" in n for n in excluded) and any("초밥" in n for n in excluded)
     assert not any("횟집" in n or "초밥" in n for n in names)
     assert "한식" in names[0] or "백반" in names[0]  # 2명이 원한 한식이 1위
-    assert "3명 중 2명이 원하는 한식" in out["results"][0]["reasons"]
+    assert "한식 2명" in out["results"][0]["reasons"]
 
 
 def test_override_region_and_type(store):
@@ -169,7 +182,7 @@ def test_ai_estimates_drive_budget_and_atmosphere(monkeypatch, store):
     top = out["results"][0]
     assert "분식" in top["name"]
     assert top["estimate"]["source"] == "ai"
-    assert any("예산 맞는 사람 2/2" in r for r in top["reasons"])
+    assert any("예산 맞는 사람 2명" in r for r in top["reasons"])
 
 
 def test_ai_cannot_lower_rule_allergy_risk(monkeypatch, store):
@@ -238,7 +251,7 @@ def test_ai_results_cached(monkeypatch, store):
 def test_ai_invalid_values_dropped():
     c = estimate._clean_ai({"price_band": 9, "atmospheres": ["없는분위기", "조용한"], "styles": ["일식", "x"],
                             "allergy_risk": {"땅콩": "maybe"}}, "restaurant", ["땅콩"])
-    assert c["price_band"] is None and c["atmospheres"] == ["조용한"] and c["styles"] == ["일식"]
+    assert c["price_band"] is None and c["atmospheres"] == [] and c["styles"] == ["일식"]
     assert c["allergy_risk"] == {"땅콩": "unknown"}
 
 
@@ -330,7 +343,7 @@ def test_cafe_style_from_name_without_ai(store):
     people = [person("a", place_type="cafe", styles=["디저트·케이크"]), person("b", place_type="cafe", styles=["디저트·케이크"])]
     out = recommend(people, eatpl.SampleClient(), store, place_type="cafe", api_key="")
     assert "디저트" in out["results"][0]["name"]
-    assert "2명 중 2명이 원하는 디저트·케이크" in out["results"][0]["reasons"]
+    assert "디저트-케이크 2명" in out["results"][0]["reasons"]
 
 
 @pytest.mark.parametrize("name, btype, allergen", [
@@ -409,7 +422,7 @@ def test_background_returns_rules_first_then_ai(monkeypatch, store):
     next(iter(rec_mod._jobs.values()))["thread"].join(5)
     done = recommend(people, ManyClient(), store, api_key="k", background=True)
     assert not done["ai_pending"] and done["results"][0]["estimate"]["source"] == "ai"
-    assert "분위기 '조용한' 원하는 사람 1명" in done["results"][0]["reasons"]
+    assert done["results"][0]["estimate"]["atmospheres"] == []
     assert len(calls) == 1  # 모델 1번 호출 = 요청 1번
     recommend(people, ManyClient(), store, api_key="k", background=True)
     assert len(rec_mod._jobs) == 1 and len(calls) == 1  # 끝난 뒤 다시 물어도 다음 20곳을 보내지 않음
@@ -490,7 +503,7 @@ def test_diagnose_runs_end_to_end(monkeypatch, tmp_path):
     assert "sk-or-test-secret" not in md + json.dumps(rep) and "BDAI" not in md  # 키·기관명이 보고서에 없음
     bar = rep["recommend"][2]
     assert bar["top"][0]["name"] == "홍대 이자카야 하루" and bar["top"][0]["has_eatpl_link"]
-    assert "2명 중 2명이 원하는 이자카야" in bar["top"][0]["reasons"] or "3명 중 2명이 원하는 이자카야" in bar["top"][0]["reasons"]
+    assert "이자카야 2명" in bar["top"][0]["reasons"]
 
 
 # ---------------------------------------------------------------- 실데이터(K-Skill, 2026-11-17)에서 찾은 문제

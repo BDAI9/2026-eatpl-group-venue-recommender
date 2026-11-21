@@ -1,5 +1,6 @@
 """회의(11/19)에서 정한 수정: 방장이 정한 지역·업종, 방장 초기화, 지역 검증, 선택지 정리."""
 import json
+import sqlite3
 import threading
 import urllib.request as urlreq
 from http.server import ThreadingHTTPServer
@@ -64,9 +65,14 @@ def test_host_fixed_region_and_type_win_over_participants(env):
     # 수정해도 마찬가지
     st, _ = call(base, f"/api/rooms/{rid}/participants/{p['id']}", "PUT", {**me("가", place_type="cafe"), "token": p["token"]})
     assert st == 200 and call(base, f"/api/rooms/{rid}")[1]["participants"][0]["place_type"] == "bar"
-    # 추천도 방장이 정한 지역·업종으로만
+    # 정원이 찰 때만 추천하며, 방장이 정한 지역·업종으로만 계산한다.
+    assert call(base, f"/api/rooms/{rid}/recommend", "POST", {})[0] == 409
+    for name in ("나", "다"):
+        assert call(base, f"/api/rooms/{rid}/participants", "POST", me(name))[0] == 201
     st, rec = call(base, f"/api/rooms/{rid}/recommend", "POST", {"region": "강남", "place_type": "cafe"})
     assert st == 200 and rec["region"] == "홍대" and rec["place_type"] == "bar"
+    assert call(base, f"/api/rooms/{rid}/participants/{p['id']}", "DELETE", {"token": p["token"]})[0] == 200
+    assert call(base, f"/api/rooms/{rid}/recommend", "POST", {})[0] == 409
 
 
 def test_old_room_without_settings_still_works(env):
@@ -91,7 +97,44 @@ def test_only_host_can_reset_room(env):
     assert call(base, f"/api/rooms/{rid}/participants", "POST", me("나"))[0] == 404
 
 
-@pytest.mark.parametrize("text", ["asdfgh", "Gangnam", "강", "!!", "강남🍕", "", "   "])
+def test_join_after_concurrent_room_reset_leaves_no_orphan(tmp_path, monkeypatch):
+    path = tmp_path / "room.sqlite3"
+    host = Store(str(path))
+    guest = Store(str(path))
+    room_id, host_token = host.create_hosted_room("모임", 2)
+    original_join = guest.add_participant
+
+    def join_after_host_reset(room_id, data):
+        # App.handle already read the room. Simulate the reset committing
+        # before the participant write transaction starts.
+        assert host.delete_room(room_id, host_token)
+        return original_join(room_id, data)
+
+    monkeypatch.setattr(guest, "add_participant", join_after_host_reset)
+    app = App(guest, CountingClient())
+    status, _ = app.handle("POST", f"/api/rooms/{room_id}/participants", me("가"))
+
+    assert status == 404
+    with sqlite3.connect(path) as db:
+        assert db.execute("SELECT 1 FROM participants WHERE room_id = ?", (room_id,)).fetchone() is None
+
+
+def test_host_metadata_write_failure_rolls_back_room_and_capacity(tmp_path):
+    path = tmp_path / "room.sqlite3"
+    store = Store(str(path))
+    with sqlite3.connect(path) as db:
+        db.execute("""CREATE TRIGGER reject_room_meta BEFORE INSERT ON room_meta
+                      BEGIN SELECT RAISE(ABORT, 'metadata write rejected'); END""")
+
+    with pytest.raises(sqlite3.IntegrityError, match="metadata write rejected"):
+        store.create_hosted_room("모임", 2, region="강남", place_type="cafe")
+
+    with sqlite3.connect(path) as db:
+        assert db.execute("SELECT COUNT(*) FROM rooms").fetchone() == (0,)
+        assert db.execute("SELECT COUNT(*) FROM room_settings").fetchone() == (0,)
+
+
+@pytest.mark.parametrize("text", ["asdfgh", "강", "!!", "강남🍕", "", "   "])
 def test_region_check_rejects_bad_text(env, text):
     base, client = env
     st, body = call(base, "/api/regions/check", "POST", {"region": text})
@@ -111,7 +154,7 @@ def test_region_check_presets_aliases_and_search(env):
 
 def test_region_check_does_not_block_when_search_is_down(tmp_path):
     app = App(Store(str(tmp_path / "x.sqlite3")), CountingClient(fail=True))
-    out = app.check_region("망원역근처")
+    out = app.check_region("망원동")
     assert out["ok"] and out["warning"]
 
 
@@ -123,23 +166,27 @@ def test_room_creation_validates_region_and_type(env):
 
 def test_options_after_meeting():
     assert "공부·작업" not in options.STYLES["cafe"]
-    assert set(options.ATMOSPHERES) == {"조용한", "대화하기 좋은", "활기찬", "넓은·단체석", "가성비"}
+    assert options.ATMOSPHERES == [
+        "조용한", "대화하기 좋은", "아늑·편안", "데이트·느낌있는", "야외좌석·테라스",
+        "넓은·단체석", "룸 있음", "가성비", "작업하기 좋은",
+    ]
+    assert set(options.STYLES["cafe"]) == {"커피 맛집", "디저트-케이크", "베이커리", "아이스크림 빙수", "브런치·샐러드"}
     with pytest.raises(ValueError):
         options.validate_preference(me("가", place_type="cafe", styles=["공부·작업"]))
 
 
 @pytest.mark.parametrize("btype, name, want", [
-    ("호프", "생맥주집", ["활기찬"]), ("분식", "김밥천국", ["가성비"]), ("뷔페", "호텔 뷔페", ["넓은·단체석"]),
-    ("일반한식", "한식당", []), ("카페", "동네 커피", ["가성비"]),
+    ("호프", "생맥주집", ["활기찬"]), ("분식", "김밥천국", []), ("뷔페", "호텔 뷔페", []),
+    ("일반한식", "한식당", []), ("카페", "동네 커피", []),
 ])
 def test_rule_atmospheres_have_a_reason(btype, name, want):
-    assert estimate.rule_atmospheres(btype, name, estimate.rule_price(btype, name)) == want
+    assert estimate.rule_atmospheres(btype, name) == want
 
 
-def test_ai_atmospheres_add_to_rule_ones():
-    rule = {"price_band": 1, "atmospheres": ["가성비"], "styles": [], "allergy_risk": {}, "source": "rule"}
-    merged = estimate._merge(rule, {"price_band": None, "atmospheres": ["조용한", "가성비"], "styles": []})
-    assert merged["atmospheres"] == ["가성비", "조용한"] and merged["price_band"] == 1
+def test_old_ai_cache_does_not_infer_new_atmosphere_preferences():
+    rule = {"price_band": 1, "atmospheres": [], "styles": [], "allergy_risk": {}, "source": "rule"}
+    merged = estimate._merge(rule, {"price_band": None, "atmospheres": ["조용한", "가성비", "활기찬"], "styles": []})
+    assert merged["atmospheres"] == ["활기찬"] and merged["price_band"] == 1
 
 
 def test_wsgi_allows_new_routes():
