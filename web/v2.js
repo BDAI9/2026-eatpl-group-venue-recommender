@@ -381,8 +381,9 @@ function renderResultCard(place, index, source) {
 const HOW_WE_RECOMMEND = `<ul class="space-y-1.5 text-xs text-gray-700 list-disc pl-4">
  <li><strong>후보:</strong> 정한 지역의 잇플(BC카드) 가맹점을 최근 1개월 결제 매출 순으로 가져와요.</li>
  <li><strong>제외:</strong> 누구 한 명이라도 가진 알레르기 위험이 높은 곳은 빼요.</li>
- <li><strong>점수:</strong> 같은 종류를 원한 사람이 많을수록, 예산에 맞는 사람이 많을수록, 원하는 분위기·맛집 유형이 맞을수록 위로 올려요.</li>
- <li><strong>근거:</strong> 분위기는 잇플 후기 요약과 편의 안내를 확인해 반영해요. 가격은 메뉴 정보나 업종 추정을 써요. 점수가 같으면 결제 매출이 높은 곳이 먼저예요.</li></ul>`;
+ <li><strong>음식 우선순위:</strong> 식당은 더 많은 사람이 선택한 음식 종류를 먼저 보여줘요. 그 종류가 확인된 매장이 없거나 알레르기 위험이 높으면 다음 선택지를 보여줘요.</li>
+ <li><strong>세부 점수:</strong> 같은 득표수 안에서는 예산·분위기·맛집 유형이 얼마나 맞는지 비교하고, 점수가 같으면 매출 순위로 정해요.</li>
+ <li><strong>근거:</strong> 음식 종류는 잇플 업종과 확인 가능한 상세 정보로 분류해요. 가격은 메뉴 정보나 업종 추정이라 실제와 다를 수 있어요.</li></ul>`;
 function humanizeRecommendationWarning(message) {
   if (typeof message !== 'string') return '';
   if (message.includes('OPENROUTER_API_KEY')) {
