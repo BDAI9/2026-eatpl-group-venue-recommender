@@ -357,7 +357,7 @@ function renderResultCard(place, index, source) {
   const real=source!=='sample' && !place.is_sample;
   const national=top&&real?rankLabel(place.sales_rank,'전국',5):'';
   const ranking=top&&real?(national||rankLabel(place.region_sales_rank,'지역',10)):'';
-  const crown=Boolean(national)&&place.sales_rank<=1;
+
   const signals=real?Object.entries(STATE.options.signal_fields||{}).filter(([,field])=>place[field]===true).map(([label])=>label):[];
   const start=real?timeLabel(place.open):'', end=real?timeLabel(place.close):'';
   const nextDay=start && end && end<start ? ' (다음 날)' : '';
