@@ -415,10 +415,35 @@ function renderPage6() { const data=STATE.result; const solo=STATE.resultBackPag
  return `<div class="flex-1 p-5 page-enter"><h2 class="text-2xl font-bold mt-3">어디로 갈까요?</h2><p id="result-status" role="status" class="text-xs text-gray-500 mt-2">${status}</p>
  ${data?.station_radius_m?`<p class="text-xs text-gray-600 mt-2">역 중심에서 직선 반경 ${data.station_radius_m}m</p>`:''}
  ${solo?'':renderResultChoices(STATE.room)}
- ${(data?.warnings||[]).map(w=>`<p class="text-xs text-amber-800 mt-2">${esc(humanizeRecommendationWarning(w))}</p>`).join('')}${body}
- ${data?.excluded?.length?`<details class="mt-4 text-xs"><summary class="font-bold">알레르기 위험 신호로 제외된 곳 (${data.excluded.length})</summary>${data.excluded.map(p=>`<p class="mt-1">${esc(p.name)} · ${esc(p.reason)}</p>`).join('')}</details>`:''}
+ <div id="result-warnings">${(data?.warnings||[]).map(w=>`<p class="text-xs text-amber-800 mt-2">${esc(humanizeRecommendationWarning(w))}</p>`).join('')}</div>
+ <div id="result-body">${body}</div>
+ <div id="result-excluded">${data?.excluded?.length?`<details class="mt-4 text-xs"><summary class="font-bold">알레르기 위험 신호로 제외된 곳 (${data.excluded.length})</summary>${data.excluded.map(p=>`<p class="mt-1">${esc(p.name)} · ${esc(p.reason)}</p>`).join('')}</details>`:''}</div>
  <p class="text-xs text-gray-500 mt-5">가격과 이용 조건은 매장에 확인해 주세요. 알레르기가 있다면 실제 재료도 확인해 주세요.</p><button type="button" onclick="goBack()" class="mt-5 text-xs font-bold text-[#a9283b]">← ${solo?'조건 다시 고르기':'참여 현황으로'}</button>
- ${data?.status==='ok'?`<details id="result-how" class="mt-2 rounded-2xl border border-gray-200"><summary class="px-3.5 py-2.5 text-xs font-bold text-gray-700 cursor-pointer">어떻게 추천했나요?</summary><div class="px-3.5 pb-3">${HOW_WE_RECOMMEND}</div></details>`:''}</div>`; }
+ <div id="result-how-wrap">${data?.status==='ok'?`<details id="result-how" class="mt-2 rounded-2xl border border-gray-200"><summary class="px-3.5 py-2.5 text-xs font-bold text-gray-700 cursor-pointer">어떻게 추천했나요?</summary><div class="px-3.5 pb-3">${HOW_WE_RECOMMEND}</div></details>`:''}</div></div>`; }
+function patchResultView() {
+ // Keep the 6/6 page, heading and other users' open sections mounted even if
+ // background enrichment changes a shop or warning. Patch only affected regions.
+ const regions=['result-warnings','result-body','result-excluded','result-how-wrap'];
+ if(regions.some(id=>!$(id))) return false;
+ const template=document.createElement('template');
+ template.innerHTML=renderPage6();
+ const scrollY=window.scrollY;
+ for(const id of regions) {
+   const current=$(id);
+   const next=template.content.querySelector('#'+id);
+   if(!next || current.innerHTML===next.innerHTML) continue;
+   const opened=[...current.querySelectorAll('details[id][open]')].map(x=>x.id);
+   current.innerHTML=next.innerHTML;
+   for(const key of opened) {
+     const restored=$(key);
+     if(restored) restored.open=true;
+   }
+ }
+ const status=$('result-status');
+ if(status) status.textContent=resultStatusText(STATE.result);
+ window.scrollTo(0, scrollY);
+ return true;
+}
 function renderApp({quiet=false}={}) { const header=$('app-header'); header.classList.toggle('hidden',STATE.currentPage===1);
  const back=$('back-btn');
  if(back) {
@@ -512,8 +537,10 @@ async function getResults(retry=0, run=++resultRun) {
    STATE.loading=false;
    STATE.location=data.region||STATE.location;
    STATE.placeType=data.place_type||STATE.placeType;
-   if(!retry || resultContentKey(data)!==resultContentKey(previous)) {
-     renderApp({quiet:retry>0});
+   if(!retry) {
+     renderApp();
+   } else if(resultContentKey(data)!==resultContentKey(previous)) {
+     if(!patchResultView()) renderApp({quiet:true});
    } else {
      const status=$('result-status');
      if(status) status.textContent=resultStatusText(data);
