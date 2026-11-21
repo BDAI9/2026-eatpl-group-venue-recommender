@@ -383,6 +383,13 @@ const HOW_WE_RECOMMEND = `<ul class="space-y-1.5 text-xs text-gray-700 list-disc
  <li><strong>제외:</strong> 누구 한 명이라도 가진 알레르기 위험이 높은 곳은 빼요.</li>
  <li><strong>점수:</strong> 같은 종류를 원한 사람이 많을수록, 예산에 맞는 사람이 많을수록, 원하는 분위기·맛집 유형이 맞을수록 위로 올려요.</li>
  <li><strong>근거:</strong> 분위기는 잇플 후기 요약과 편의 안내를 확인해 반영해요. 가격은 메뉴 정보나 업종 추정을 써요. 점수가 같으면 결제 매출이 높은 곳이 먼저예요.</li></ul>`;
+function humanizeRecommendationWarning(message) {
+  if (typeof message !== 'string') return '';
+  if (message.includes('OPENROUTER_API_KEY')) {
+    return '일부 상세 정보가 없어 업종을 기준으로 추천했어요. 가격과 분위기는 방문 전에 확인해 주세요.';
+  }
+  return message;
+}
 function renderPage6() { const data=STATE.result; const solo=STATE.resultBackPage===4; let body='';
  const region=data?.region || fixedRegion() || STATE.location, type=data?.place_type || fixedType() || STATE.placeType;
  if(data?.status==='ok') body=`<div class="mt-5"><div class="flex items-center justify-between gap-2"><h3 class="min-w-0 break-words text-2xl font-bold text-gray-900">${esc(region)} · ${esc(STATE.options.place_types[type]||'')}</h3><span class="shrink-0 text-xs text-gray-500">${data.source==='sample'?'가상 샘플':'eat.pl 잇플'}</span></div>${data.source!=='sample'?'<p class="text-xs text-gray-500 mt-1">결제 지표: 잇플 · BC카드 최근 1개월 결제 데이터 기반</p>':''}
@@ -398,7 +405,7 @@ function renderPage6() { const data=STATE.result; const solo=STATE.resultBackPag
  return `<div class="flex-1 p-5 page-enter"><h2 class="text-2xl font-bold mt-3">어디로 갈까요?</h2><p id="result-status" role="status" class="text-xs text-gray-500 mt-2">${status}</p>
  ${data?.station_radius_m?`<p class="text-xs text-gray-600 mt-2">역 중심에서 직선 반경 ${data.station_radius_m}m</p>`:''}
  ${solo?'':renderResultChoices(STATE.room)}
- ${(data?.warnings||[]).map(w=>`<p class="text-xs text-amber-800 mt-2">${esc(w)}</p>`).join('')}${body}
+ ${(data?.warnings||[]).map(w=>`<p class="text-xs text-amber-800 mt-2">${esc(humanizeRecommendationWarning(w))}</p>`).join('')}${body}
  ${data?.excluded?.length?`<details class="mt-4 text-xs"><summary class="font-bold">알레르기 위험 신호로 제외된 곳 (${data.excluded.length})</summary>${data.excluded.map(p=>`<p class="mt-1">${esc(p.name)} · ${esc(p.reason)}</p>`).join('')}</details>`:''}
  <p class="text-xs text-gray-500 mt-5">가격과 이용 조건은 매장에 확인해 주세요. 알레르기가 있다면 실제 재료도 확인해 주세요.</p><button type="button" onclick="goBack()" class="mt-5 text-xs font-bold text-[#a9283b]">← ${solo?'조건 다시 고르기':'참여 현황으로'}</button>
  ${data?.status==='ok'?`<details id="result-how" class="mt-2 rounded-2xl border border-gray-200"><summary class="px-3.5 py-2.5 text-xs font-bold text-gray-700 cursor-pointer">어떻게 추천했나요?</summary><div class="px-3.5 pb-3">${HOW_WE_RECOMMEND}</div></details>`:''}</div>`; }
