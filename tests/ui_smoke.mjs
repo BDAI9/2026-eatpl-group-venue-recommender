@@ -23,13 +23,17 @@ try {
   assert.equal(heroOverflow, false, 'Home must not overflow mobile viewport');
   await page.getByRole('button', { name: /이 동네에서 시작하기/ }).click();
   await page.getByRole('heading', { name: '누가, 어떻게 고를까요?' }).waitFor();
+  await page.screenshot({ path: 'artifacts/decision-mobile.png', fullPage: true });
 
   await page.locator('button[onclick="setTargetSize(2)"]').click();
   await page.getByRole('button', { name: /다음 · 업종 및 메뉴/ }).click();
+  await page.screenshot({ path: 'artifacts/categories-mobile.png', fullPage: true });
   await page.getByRole('button', { name: /다음 · 조건 선택하기/ }).click();
+  await page.screenshot({ path: 'artifacts/preferences-mobile.png', fullPage: true });
   await page.locator('#name').fill('자동테스트 A');
   await page.locator('#conditions-form button[type=submit]').click();
   await page.locator('#share-link').waitFor();
+  await page.screenshot({ path: 'artifacts/room-mobile.png', fullPage: true });
 
   const roomUrl = await page.locator('#share-link').inputValue();
   assert.match(roomUrl, /\/r\/[a-zA-Z0-9_-]{4,20}$/);
