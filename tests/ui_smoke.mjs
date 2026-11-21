@@ -112,6 +112,19 @@ try {
     true, 'Unchanged 6/6 poll must not rebuild recommendation cards');
   assert.equal(await page.locator('#result-how').evaluate(el => el.open),
     true, 'Unchanged 6/6 poll must preserve open explanations');
+  // A background warning update must NOT replace the results card or page heading.
+  await page.evaluate(() => {
+    window.__stableResultHeading = document.querySelector('#page-viewport h2');
+    STATE.result = {...STATE.result, warnings: [...(STATE.result.warnings||[]), '상세 정보 점검 중']};
+    if(!patchResultView()) throw new Error('Patch targets unavailable');
+  });
+  assert.equal(await page.evaluate(() => document.querySelector('#page-viewport h2') === window.__stableResultHeading),
+    true, 'Warning update must keep result heading mounted');
+  assert.equal(await page.evaluate(() => document.querySelector('.place-card') === window.__stableResultCard),
+    true, 'Warning update must not rebuild recommendation cards');
+  assert.equal(await page.locator('#result-how').evaluate(el => el.open),
+    true, 'Warning update must preserve explanation state');
+  assert.match(await page.locator('#result-warnings').innerText(), /상세 정보 점검 중/);
   const result = await page.locator('#page-viewport').innerText();
   assert.match(result, /추천|장소/);
   await page.screenshot({ path: 'artifacts/results-mobile.png', fullPage: true });
