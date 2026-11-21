@@ -7,7 +7,11 @@ const STATE = { currentPage: 1, location: '', decisionMode: 'group', placeType: 
   recRegion: '', recType: '', companion: 'solo', targetSize: 4, customTarget: false,
   appliedCompanion: null, suggestedAtmospheres: [], host: null, confirmReset: false, checking: false, regionChoices: [] };
 const QUICK_DISTRICTS = ['강남', '성수', '홍대', '을지로', '여의도', '잠실', '종로', '합정'];
-const icons = {restaurant:'🍚', cafe:'☕', bar:'🍻'};
+const icons = {
+ restaurant: '<svg viewBox="0 0 24 24" class="w-6 h-6 mx-auto" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 11h16M6 11v2a6 6 0 0 0 12 0v-2M9 18h6M10 3v5M14 3v5"/></svg>',
+ cafe: '<svg viewBox="0 0 24 24" class="w-6 h-6 mx-auto" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 8h13v7a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8zM17 9h2a3 3 0 0 1 0 6h-2M7 3v2M12 3v2"/></svg>',
+ bar: '<svg viewBox="0 0 24 24" class="w-6 h-6 mx-auto" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="m4 4 8 9 8-9H4zM12 13v7M8 20h8"/></svg>'
+};
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const $ = id => document.getElementById(id);
 // The hosted frontend uses the same live room database on Lightsail.
@@ -50,6 +54,11 @@ function handleLocationInput(value) {
   STATE.regionChoices=[];
   $('region-choices')?.replaceChildren();
   $('loc-clear-btn')?.classList.toggle('hidden',!value);
+  document.querySelectorAll('.home-quick-chip').forEach(chip => {
+    const selected = chip.textContent.trim() === value;
+    chip.classList.toggle('is-selected', selected);
+    chip.setAttribute('aria-pressed', String(selected));
+  });
 }
 function clearLocationInput() { handleLocationInput(''); $('location-input').value=''; $('location-input').focus(); }
 function selectQuickDistrict(value) { handleLocationInput(value); $('location-input').value=value; }
@@ -113,10 +122,10 @@ function goToPage(page) { resultRun++; STATE.currentPage=page; STATE.error=''; r
 function typeLabel() { return STATE.options?.place_types?.[STATE.placeType] || ''; }
 function setMode(mode) { STATE.decisionMode=mode; STATE.error=''; renderApp(); }
 const COMPANIONS = [
-  {id:'solo', icon:'🍚', title:'1인 · 혼밥', desc:'혼자 편하게 즐기는 한 끼', atmosphere:[]},
-  {id:'date', icon:'💑', title:'둘이서 · 데이트', desc:'대화하기 좋고 감성적인 분위기', atmosphere:['대화하기 좋은', '데이트·느낌있는']},
-  {id:'friends', icon:'🙌', title:'여럿이 · 친구모임', desc:'함께 편하게 이야기하기 좋은 분위기', atmosphere:['대화하기 좋은']},
-  {id:'family', icon:'👨‍👩‍👧‍👦', title:'가족 · 단체회식', desc:'다같이 모일 수 있는 단체석 선호', atmosphere:['넓은·단체석']},
+  {id:'solo', icon:'1인', title:'1인 · 혼밥', desc:'혼자 편하게 즐기는 한 끼', atmosphere:[]},
+  {id:'date', icon:'2인', title:'둘이서 · 데이트', desc:'대화하기 좋고 감성적인 분위기', atmosphere:['대화하기 좋은', '데이트·느낌있는']},
+  {id:'friends', icon:'친구', title:'여럿이 · 친구모임', desc:'함께 편하게 이야기하기 좋은 분위기', atmosphere:['대화하기 좋은']},
+  {id:'family', icon:'가족', title:'가족 · 단체회식', desc:'다같이 모일 수 있는 단체석 선호', atmosphere:['넓은·단체석']},
 ];
 function setCompanion(id) { if(COMPANIONS.some(item=>item.id===id)) { STATE.companion=id; renderApp(); } }
 const CUSTOM_TARGET_MIN=5;
@@ -163,23 +172,23 @@ function toggleStyle(control, redraw=true) {
 }
 function checkbox(label, name, selected, disableUnselected=false) {
  const checked=selected.includes(label);
- return `<label class="inline-flex cursor-pointer"><input class="peer sr-only" type="checkbox" name="${esc(name)}" value="${esc(label)}" ${checked?'checked':disableUnselected?'disabled':''}><span class="px-3 py-2 rounded-xl border border-gray-200 text-xs font-semibold peer-checked:bg-[#bd2333] peer-checked:text-white peer-checked:border-[#bd2333] peer-disabled:cursor-not-allowed peer-disabled:opacity-50 peer-focus-visible:ring-2 peer-focus-visible:ring-[#bd2333]">${esc(label)}</span></label>`;
+ return `<label class="inline-flex cursor-pointer"><input class="peer sr-only" type="checkbox" name="${esc(name)}" value="${esc(label)}" ${checked?'checked':disableUnselected?'disabled':''}><span class="px-3 py-2 rounded-xl border border-gray-200 text-xs font-semibold peer-checked:bg-[#a9283b] peer-checked:text-white peer-checked:border-[#a9283b] peer-disabled:cursor-not-allowed peer-disabled:opacity-50 peer-focus-visible:ring-2 peer-focus-visible:ring-[#a9283b]">${esc(label)}</span></label>`;
 }
 function renderPage2() { return `<div class="flex-1 flex flex-col justify-between p-5 page-enter"><div>
  <div class="inline-flex px-3 py-1 rounded-lg bg-gray-100 text-gray-600 text-xs font-semibold mb-3">📍 ${esc(STATE.location)}</div>
- <h2 class="text-2xl font-extrabold text-gray-900">누가, 어떻게 고를까요?</h2><p class="text-xs text-gray-500 mt-2">혼자 고르거나 링크를 공유해 함께 선택할 수 있어요.</p>
- <div class="grid grid-cols-2 gap-2 p-1.5 bg-gray-100 rounded-2xl mt-5" role="group" aria-label="결정 방식">${[['solo','🙋 나 혼자 결정','조건 선택 시 바로 결정'],['group','🗳️ 다같이 선택','링크 공유 · 참여 현황']].map(([id,title,desc])=>`<button type="button" onclick="setMode('${id}')" aria-pressed="${STATE.decisionMode===id}" class="py-3 rounded-xl text-sm font-extrabold ${STATE.decisionMode===id?'bg-white text-[#bd2333] shadow-sm':'text-gray-500'}">${title}<span class="block text-[10px] font-medium mt-1">${desc}</span></button>`).join('')}</div>
+ <h2 class="text-2xl font-bold text-gray-900">누가, 어떻게 고를까요?</h2><p class="text-xs text-gray-500 mt-2">혼자 고르거나 링크를 공유해 함께 선택할 수 있어요.</p>
+ <div class="grid grid-cols-2 gap-2 p-1.5 bg-gray-100 rounded-2xl mt-5" role="group" aria-label="결정 방식">${[['solo','혼자 결정','조건 선택 후 바로 추천'],['group','함께 결정','링크 공유 · 함께 선택']].map(([id,title,desc])=>`<button type="button" onclick="setMode('${id}')" aria-pressed="${STATE.decisionMode===id}" class="py-3 rounded-xl text-sm font-bold ${STATE.decisionMode===id?'bg-white text-[#a9283b] shadow-sm':'text-gray-500'}">${title}<span class="block text-xs font-medium mt-1">${desc}</span></button>`).join('')}</div>
  ${STATE.decisionMode==='solo' ? `
- <div class="flex items-center justify-between mt-6 mb-3"><p class="text-sm font-bold text-gray-700">동행 유형</p><span class="text-xs font-semibold text-[#bd2333]">1개 선택</span></div>
- <div class="space-y-2" role="group" aria-label="동행 유형">${COMPANIONS.map(item=>`<button type="button" onclick="setCompanion('${item.id}')" aria-pressed="${STATE.companion===item.id}" class="w-full flex items-center gap-3 p-4 text-left rounded-2xl border-2 ${STATE.companion===item.id?'border-[#bd2333] bg-[#fdf2f3]':'border-gray-100 bg-white'}"><span class="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-xl">${item.icon}</span><span class="flex-1"><strong class="block text-sm">${esc(item.title)}</strong><span class="block text-xs text-gray-500 mt-1">${esc(item.desc)}</span></span><span aria-hidden="true" class="text-[#bd2333] font-bold">${STATE.companion===item.id?'●':'○'}</span></button>`).join('')}</div>
- <p class="text-[11px] text-gray-500 mt-3">선택한 유형에 맞춰 선호 분위기를 미리 골라드려요. 다음 조건 화면에서 자유롭게 바꿀 수 있어요.</p>` : `
- <div class="flex items-center justify-between mt-6 mb-3"><p class="text-sm font-bold text-gray-700">함께 선택할 인원</p><span class="text-xs font-semibold text-[#bd2333]">나를 포함한 인원</span></div>
- <div class="grid grid-cols-2 gap-2" role="group" aria-label="참여 인원">${[[2,'✌️'],[3,'🤟'],[4,'🍀']].map(([count,icon])=>`<button type="button" onclick="setTargetSize(${count})" aria-pressed="${!STATE.customTarget&&STATE.targetSize===count}" class="p-4 min-h-[108px] text-left rounded-2xl border-2 ${!STATE.customTarget&&STATE.targetSize===count?'border-[#bd2333] bg-[#fdf2f3]':'border-gray-100 bg-white'}"><span class="block text-xl">${icon}</span><strong class="block text-sm mt-2">${count}명</strong></button>`).join('')}
- <button type="button" onclick="setCustomTarget()" aria-pressed="${STATE.customTarget}" class="p-4 min-h-[108px] text-left rounded-2xl border-2 ${STATE.customTarget?'border-[#bd2333] bg-[#fdf2f3]':'border-gray-100 bg-white'}"><span class="block text-xl" aria-hidden="true">🖐️</span><strong class="block text-sm mt-2">${CUSTOM_TARGET_MIN}명 이상</strong><span class="block text-xs font-medium text-gray-500 mt-1">직접 입력</span></button></div>
+ <div class="flex items-center justify-between mt-6 mb-3"><p class="text-sm font-bold text-gray-700">동행 유형</p><span class="text-xs font-semibold text-[#a9283b]">1개 선택</span></div>
+ <div class="space-y-2" role="group" aria-label="동행 유형">${COMPANIONS.map(item=>`<button type="button" onclick="setCompanion('${item.id}')" aria-pressed="${STATE.companion===item.id}" class="w-full flex items-center gap-3 p-4 text-left rounded-2xl border-2 ${STATE.companion===item.id?'border-[#a9283b] bg-[#fdf2f3]':'border-gray-100 bg-white'}"><span class="w-11 h-11 flex items-center justify-center rounded-xl bg-gray-50 text-xs font-bold text-gray-600 shrink-0">${item.icon}</span><span class="flex-1"><strong class="block text-sm">${esc(item.title)}</strong><span class="block text-xs text-gray-500 mt-1">${esc(item.desc)}</span></span><span aria-hidden="true" class="text-[#a9283b] font-bold">${STATE.companion===item.id?'●':'○'}</span></button>`).join('')}</div>
+ <p class="text-xs text-gray-500 mt-3">선택한 유형에 맞춰 선호 분위기를 미리 골라드려요. 다음 조건 화면에서 자유롭게 바꿀 수 있어요.</p>` : `
+ <div class="flex items-center justify-between mt-6 mb-3"><p class="text-sm font-bold text-gray-700">함께 선택할 인원</p><span class="text-xs font-semibold text-[#a9283b]">나를 포함한 인원</span></div>
+ <div class="grid grid-cols-2 gap-2" role="group" aria-label="참여 인원">${[[2,'02'],[3,'03'],[4,'04']].map(([count,icon])=>`<button type="button" onclick="setTargetSize(${count})" aria-pressed="${!STATE.customTarget&&STATE.targetSize===count}" class="p-4 min-h-[108px] text-left rounded-2xl border-2 ${!STATE.customTarget&&STATE.targetSize===count?'border-[#a9283b] bg-[#fdf2f3]':'border-gray-100 bg-white'}"><strong class="block text-2xl font-semibold tabular-nums">${count}</strong><span class="block text-xs mt-1 text-gray-500">명</span></button>`).join('')}
+ <button type="button" onclick="setCustomTarget()" aria-pressed="${STATE.customTarget}" class="p-4 min-h-[108px] text-left rounded-2xl border-2 ${STATE.customTarget?'border-[#a9283b] bg-[#fdf2f3]':'border-gray-100 bg-white'}"><span class="block text-2xl font-semibold" aria-hidden="true">+</span><strong class="block text-sm mt-2">${CUSTOM_TARGET_MIN}명 이상</strong><span class="block text-xs font-medium text-gray-500 mt-1">직접 입력</span></button></div>
  ${STATE.customTarget?`<label class="block text-xs font-bold text-gray-700 mt-4" for="target-size">참여 인원 (${CUSTOM_TARGET_MIN}~30명)</label><input id="target-size" type="number" inputmode="numeric" min="${CUSTOM_TARGET_MIN}" max="30" step="1" value="${esc(STATE.targetSize)}" class="w-full px-4 py-3 rounded-2xl border border-gray-200 text-sm mt-2" placeholder="예: ${CUSTOM_TARGET_MIN}">`:''}
- <p class="text-[11px] text-gray-500 mt-3">방장이 정한 인원이 모두 참여하면 정원이 마감돼요. 정원이 차면 모두의 조건으로 추천을 볼 수 있어요.</p>`}
+ <p class="text-xs text-gray-500 mt-3">방장이 정한 인원이 모두 참여하면 정원이 마감돼요. 정원이 차면 모두의 조건으로 추천을 볼 수 있어요.</p>`}
  <p role="status" class="text-xs text-red-700 mt-3">${esc(STATE.error)}</p></div>
- <button type="button" onclick="nextFromDecision()" class="w-full mt-6 py-3.5 rounded-2xl bg-[#bd2333] text-white font-bold text-sm shadow-md">다음 · 업종 및 메뉴 고르기 →</button></div>`; }
+ <button type="button" onclick="nextFromDecision()" class="w-full mt-6 py-3.5 rounded-2xl bg-[#a9283b] text-white font-bold text-sm shadow-md">다음 · 업종 및 메뉴 고르기 →</button></div>`; }
 const PAGE3_STYLE_LABELS = {
  '디저트-케이크':'디저트·케이크',
  '아이스크림 빙수':'아이스크림·빙수',
@@ -190,7 +199,7 @@ const PAGE3_STYLE_LABELS = {
 function renderStyleButton(style) {
  const selected=STATE.styles.includes(style);
  const label=PAGE3_STYLE_LABELS[style] ?? style;
- return `<button type="button" data-value="${esc(style)}" onclick="toggleStyle(this)" aria-pressed="${selected}" class="px-3.5 py-3 rounded-xl border-2 text-left text-xs font-semibold ${selected?'bg-[#bd2333] text-white border-[#bd2333]':'border-gray-100 text-gray-700'}">${esc(label)} <span class="float-right" aria-hidden="true">${selected?'✓':'선택'}</span></button>`;
+ return `<button type="button" data-value="${esc(style)}" onclick="toggleStyle(this)" aria-pressed="${selected}" class="px-3.5 py-3 rounded-xl border-2 text-left text-xs font-semibold ${selected?'bg-[#a9283b] text-white border-[#a9283b]':'border-gray-100 text-gray-700'}">${esc(label)} <span class="float-right" aria-hidden="true">${selected?'✓':''}</span></button>`;
 }
 function renderPage3() { const fixed=fixedType(); if(fixed) STATE.placeType=fixed;
  const types=Object.entries(STATE.options.place_types).filter(([id])=>!fixed || id===fixed);
@@ -198,20 +207,20 @@ function renderPage3() { const fixed=fixedType(); if(fixed) STATE.placeType=fixe
  const preferences=STATE.options.style_preferences?.[STATE.placeType]||[];
  const selected=styles.filter(s=>STATE.styles.includes(s)).length;
  return `<div class="flex-1 flex flex-col justify-between p-5 page-enter"><div><div class="inline-flex px-3 py-1 rounded-lg bg-gray-100 text-xs font-semibold mb-3">📍 ${esc(fixedRegion() || STATE.location || '지역 선택')}</div>
- <h2 class="text-2xl font-extrabold">어떤 곳에 갈까요?</h2><p class="text-xs text-gray-500 mt-2">${fixed?`방장이 정한 장소예요. 원하는 ${esc(STATE.options.style_label[fixed])}를 골라 주세요.`:'카페·식당·술집과 원하는 종류를 골라 주세요.'}</p>
- <div class="grid ${fixed?'grid-cols-1':'grid-cols-3'} gap-2 mt-5">${types.map(([id,title])=>`<button type="button" ${fixed?'disabled':`onclick="setType('${esc(id)}')"`} class="p-4 rounded-2xl border-2 text-center ${id===STATE.placeType?'border-[#bd2333] bg-[#fdf2f3]':'border-gray-100'}"><span class="block text-2xl">${icons[id]||'🍽️'}</span><span class="block text-sm font-bold mt-2">${esc(title)}</span></button>`).join('')}</div>
- <div class="mt-6"><div class="flex items-center justify-between mb-3"><p class="text-xs font-bold text-gray-700">${esc(STATE.options.style_label[STATE.placeType])} · 여러 개 선택 가능</p><span class="text-[11px] text-[#bd2333]">${selected ? `${selected}개 선택` : '아무거나'}</span></div><div class="grid grid-cols-2 gap-2">${styles.map(renderStyleButton).join('')}<button type="button" onclick="clearStyles()" aria-pressed="${selected===0}" class="px-3.5 py-3 rounded-xl border-2 text-left text-xs font-semibold ${selected===0?'bg-[#bd2333] text-white border-[#bd2333]':'border-gray-100 text-gray-700'}">아무거나 <span class="float-right" aria-hidden="true">${selected===0?'✓':''}</span></button></div></div>
+ <h2 class="text-2xl font-bold">어떤 곳에 갈까요?</h2><p class="text-xs text-gray-500 mt-2">${fixed?`방장이 정한 장소예요. 원하는 ${esc(STATE.options.style_label[fixed])}를 골라 주세요.`:'카페·식당·술집과 원하는 종류를 골라 주세요.'}</p>
+ <div class="grid ${fixed?'grid-cols-1':'grid-cols-3'} gap-2 mt-5">${types.map(([id,title])=>`<button type="button" ${fixed?'disabled':`onclick="setType('${esc(id)}')"`} class="p-4 rounded-2xl border-2 text-center ${id===STATE.placeType?'border-[#a9283b] bg-[#fdf2f3]':'border-gray-100'}"><span class="block text-gray-600">${icons[id]||''}</span><span class="block text-sm font-bold mt-2">${esc(title)}</span></button>`).join('')}</div>
+ <div class="mt-6"><div class="flex items-center justify-between mb-3"><p class="text-xs font-bold text-gray-700">${esc(STATE.options.style_label[STATE.placeType])} · 여러 개 선택 가능</p><span class="text-xs text-[#a9283b]">${selected ? `${selected}개 선택` : '아무거나'}</span></div><div class="grid grid-cols-2 gap-2">${styles.map(renderStyleButton).join('')}<button type="button" onclick="clearStyles()" aria-pressed="${selected===0}" class="px-3.5 py-3 rounded-xl border-2 text-left text-xs font-semibold ${selected===0?'bg-[#a9283b] text-white border-[#a9283b]':'border-gray-100 text-gray-700'}">아무거나 <span class="float-right" aria-hidden="true">${selected===0?'✓':''}</span></button></div></div>
  ${preferences.length?`<div class="mt-2 flex justify-end gap-3" role="group" aria-label="선호 옵션">
    ${preferences.map(style=>`<label class="inline-flex min-h-[30px] cursor-pointer items-center gap-1.5">
      <span class="text-xs font-semibold text-gray-700">${esc(style)}</span>
      <input type="checkbox" role="switch" class="peer sr-only" data-value="${esc(style)}" onchange="toggleStyle(this, false)" ${STATE.styles.includes(style)?'checked':''}>
-     <span aria-hidden="true" class="relative h-4 w-8 shrink-0 rounded-full bg-gray-400 transition-colors peer-checked:bg-[#bd2333] peer-focus-visible:ring-2 peer-focus-visible:ring-[#bd2333] peer-focus-visible:ring-offset-2 after:absolute after:left-0.5 after:top-0.5 after:h-3 after:w-3 after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:content-[''] peer-checked:after:translate-x-4"></span>
+     <span aria-hidden="true" class="relative h-4 w-8 shrink-0 rounded-full bg-gray-400 transition-colors peer-checked:bg-[#a9283b] peer-focus-visible:ring-2 peer-focus-visible:ring-[#a9283b] peer-focus-visible:ring-offset-2 after:absolute after:left-0.5 after:top-0.5 after:h-3 after:w-3 after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:content-[''] peer-checked:after:translate-x-4"></span>
    </label>`).join('')}
  </div>`:''}</div>
- <button type="button" onclick="goToPage(4)" class="w-full mt-8 py-3.5 rounded-2xl bg-[#bd2333] text-white font-bold text-sm shadow-md">다음 · 조건 선택하기 →</button></div>`; }
+ <button type="button" onclick="goToPage(4)" class="w-full mt-8 py-3.5 rounded-2xl bg-[#a9283b] text-white font-bold text-sm shadow-md">다음 · 조건 선택하기 →</button></div>`; }
 function pickSummary(values, empty='선택 안 함') { return values.length ? values.join(', ') : empty; }
 function section(id, title, hint, summary, body, open=false) {
- return `<details id="sec-${id}" class="group mt-3 rounded-2xl border border-gray-200 bg-white" ${open?'open':''}><summary class="flex items-center justify-between gap-2 p-4 cursor-pointer list-none"><span><strong class="block text-sm text-gray-900">${title}</strong><span class="block text-[11px] text-gray-500 mt-0.5">${hint}</span></span><span class="flex items-center gap-2"><span id="sum-${id}" class="text-xs font-bold text-[#bd2333] text-right">${esc(summary)}</span><span class="text-gray-400 group-open:rotate-180 transition" aria-hidden="true">▾</span></span></summary><div class="px-4 pb-4">${body}</div></details>`; }
+ return `<details id="sec-${id}" class="group mt-3 rounded-2xl border border-gray-200 bg-white" ${open?'open':''}><summary class="flex items-center justify-between gap-2 p-4 cursor-pointer list-none"><span><strong class="block text-sm text-gray-900">${title}</strong><span class="block text-xs text-gray-500 mt-0.5">${hint}</span></span><span class="flex items-center gap-2"><span id="sum-${id}" class="text-xs font-bold text-[#a9283b] text-right">${esc(summary)}</span><span class="text-gray-400 group-open:rotate-180 transition" aria-hidden="true">▾</span></span></summary><div class="px-4 pb-4">${body}</div></details>`; }
 function atmosphereHint(selected) {
  const {atmosphere_limit:limit, cafe_work_atmosphere:work}=STATE.options;
  return selected.includes(work)
@@ -242,16 +251,16 @@ function renderPage4() { const o=STATE.options; const solo=isSolo();
  const atmosphereLimitReached=atmospheres.length>=o.atmosphere_limit;
  return `<form id="conditions-form" class="flex-1 flex flex-col justify-between p-5 page-enter" oninput="refreshSectionSummaries()" onchange="refreshSectionSummaries()"><div>
  <div class="inline-flex px-3 py-1 rounded-lg bg-gray-100 text-xs font-semibold mb-3">📍 ${esc(region)} · ${esc(typeLabel())}${STATE.styles.length?` · ${esc(STATE.styles.join(', '))}`:''}</div>
- <h2 class="text-2xl font-extrabold">어떤 곳을 원하세요?</h2><p class="text-xs text-gray-500 mt-2">${solo?'원하는 조건만 눌러서 골라 주세요. 모두 선택 사항이에요.':'이름을 적고, 원하는 조건을 눌러서 골라 주세요. 이름 말고는 모두 선택 사항이에요.'}</p>
+ <h2 class="text-2xl font-bold">어떤 곳을 원하세요?</h2><p class="text-xs text-gray-500 mt-2">${solo?'원하는 조건만 눌러서 골라 주세요. 모두 선택 사항이에요.':'이름을 적고, 원하는 조건을 눌러서 골라 주세요. 이름 말고는 모두 선택 사항이에요.'}</p>
  ${solo?'':`<label class="block text-xs font-bold text-gray-700 mt-5 mb-2" for="name">이름 · 필수</label><input id="name" required maxlength="20" value="${esc(STATE.name)}" class="w-full px-4 py-3 rounded-2xl border border-gray-200 text-sm" placeholder="예: 지우">`}
  <div class="mt-4">
- ${section('budget','💰 1인 예산','한 사람이 쓸 수 있는 금액', STATE.budget?o.budgets[STATE.budget]:'선택 안 함', `<select id="budget" class="w-full px-4 py-3 rounded-2xl border border-gray-200 text-sm"><option value="">선택 안 함</option>${Object.entries(o.budgets).map(([v,l])=>`<option value="${esc(v)}" ${String(STATE.budget)===v?'selected':''}>${esc(l)}</option>`).join('')}</select>`, true)}
- ${section('atmosphere','✨ 분위기',`<span id="atmosphere-hint" aria-live="polite">${atmosphereHint(atmospheres)}</span>`, pickSummary(atmospheres), `<div class="flex flex-wrap gap-2">${atmosphereOptions.map(a=>checkbox(a,'atmosphere',atmospheres,atmosphereLimitReached)).join('')}</div>`)}
- ${Array.isArray(o.signals) && o.signals.length ? section('signal','💳 맛집 유형','BC카드 결제 데이터로 확인해요', pickSummary(STATE.signals), `<div class="grid grid-cols-1 gap-2">${o.signals.map(a=>`<label class="flex items-center gap-3 p-3 rounded-2xl border border-gray-200 cursor-pointer"><input type="checkbox" name="signal" value="${esc(a)}" ${STATE.signals.includes(a)?'checked':''} class="accent-[#bd2333]"><span class="text-sm font-semibold text-gray-700">${esc(a)}</span></label>`).join('')}</div><p class="mt-2 text-[11px] text-gray-500">선택하면 해당 결제 데이터를 가진 곳을 우선 추천해요. 필수 조건은 아니에요.</p>`) : ''}
- ${section('allergy','⚠️ 알레르기','위험이 높은 곳은 추천에서 빼요', pickSummary(allergy,'없음'), `<div class="flex flex-wrap gap-2">${o.allergies.map(a=>checkbox(a,'allergy',STATE.allergies)).join('')}</div><input id="allergy-other" maxlength="40" value="${esc(STATE.allergyOther)}" class="w-full px-4 py-3 rounded-2xl border border-gray-200 text-sm mt-3" placeholder="기타 알레르기 직접 입력"><p class="text-[11px] text-gray-500 mt-3">실제 재료 정보가 없어 알레르기 안전을 보장할 수 없어요. 반드시 매장에 직접 확인하세요.${solo?'':' 방 링크를 아는 사람은 입력 내용을 볼 수 있어요.'}</p>`)}
+ ${section('budget','1인 예산','한 사람이 쓸 수 있는 금액', STATE.budget?o.budgets[STATE.budget]:'선택 안 함', `<select id="budget" class="w-full px-4 py-3 rounded-2xl border border-gray-200 text-sm"><option value="">선택 안 함</option>${Object.entries(o.budgets).map(([v,l])=>`<option value="${esc(v)}" ${String(STATE.budget)===v?'selected':''}>${esc(l)}</option>`).join('')}</select>`, true)}
+ ${section('atmosphere','분위기',`<span id="atmosphere-hint" aria-live="polite">${atmosphereHint(atmospheres)}</span>`, pickSummary(atmospheres), `<div class="flex flex-wrap gap-2">${atmosphereOptions.map(a=>checkbox(a,'atmosphere',atmospheres,atmosphereLimitReached)).join('')}</div>`)}
+ ${Array.isArray(o.signals) && o.signals.length ? section('signal','맛집 유형','BC카드 결제 데이터로 확인해요', pickSummary(STATE.signals), `<div class="grid grid-cols-1 gap-2">${o.signals.map(a=>`<label class="flex items-center gap-3 p-3 rounded-2xl border border-gray-200 cursor-pointer"><input type="checkbox" name="signal" value="${esc(a)}" ${STATE.signals.includes(a)?'checked':''} class="accent-[#a9283b]"><span class="text-sm font-semibold text-gray-700">${esc(a)}</span></label>`).join('')}</div><p class="mt-2 text-xs text-gray-500">선택하면 해당 결제 데이터를 가진 곳을 우선 추천해요. 필수 조건은 아니에요.</p>`) : ''}
+ ${section('allergy','알레르기','위험이 높은 곳은 추천에서 빼요', pickSummary(allergy,'없음'), `<div class="flex flex-wrap gap-2">${o.allergies.map(a=>checkbox(a,'allergy',STATE.allergies)).join('')}</div><input id="allergy-other" maxlength="40" value="${esc(STATE.allergyOther)}" class="w-full px-4 py-3 rounded-2xl border border-gray-200 text-sm mt-3" placeholder="기타 알레르기 직접 입력"><p class="text-xs text-gray-500 mt-3">실제 재료 정보가 없어 알레르기 안전을 보장할 수 없어요. 반드시 매장에 직접 확인하세요.${solo?'':' 방 링크를 아는 사람은 입력 내용을 볼 수 있어요.'}</p>`)}
  </div>
  <p id="form-status" role="status" class="text-xs text-red-700 mt-2">${esc(STATE.error)}</p></div>
- <button type="submit" ${STATE.loading?'disabled':''} class="w-full mt-6 py-3.5 rounded-2xl bg-[#bd2333] text-white font-bold text-sm shadow-md">${STATE.loading?'저장 중…':solo?'추천 보기 →':'조건 저장하기 →'}</button></form>`; }
+ <button type="submit" ${STATE.loading?'disabled':''} class="w-full mt-6 py-3.5 rounded-2xl bg-[#a9283b] text-white font-bold text-sm shadow-md">${STATE.loading?'저장 중…':solo?'추천 보기 →':'조건 저장하기 →'}</button></form>`; }
 function choiceGroups(room) {
  const summary=room?.summary||{}; const o=STATE.options; const type=fixedType() || summary.place_type;
  const budgets=Object.entries(summary.budgets||{}).filter(([,n])=>n>0).map(([k,n])=>[o.budgets[k]||k,n]);
@@ -274,12 +283,12 @@ function renderChoices(room) {
  const groups=choiceGroups(room);
  if(!groups.length) return '<p class="text-xs text-gray-500">모두 "아무거나"를 골랐어요.</p>';
  return groups.map(({id,title,items})=>{
-   const barColor=id==='allergies'?'bg-amber-500':'bg-[#bd2333]';
+   const barColor=id==='allergies'?'bg-amber-500':'bg-[#a9283b]';
    const rows=items.map(([label,n])=>{
      const bar=`<span aria-hidden="true" class="flex-1 h-2.5 rounded-full bg-white overflow-hidden"><span class="block h-full rounded-full ${barColor}" style="width:${Math.round(n/total*100)}%"></span></span>`;
-     return `<div class="flex items-center gap-2 mb-1.5"><span class="w-24 shrink-0 text-xs text-gray-700 truncate">${esc(label)}</span>${bar}<span class="w-12 shrink-0 text-right text-[11px] font-bold text-gray-600 whitespace-nowrap">${n}명</span></div>`;
+     return `<div class="flex items-center gap-2 mb-1.5"><span class="w-24 shrink-0 text-xs text-gray-700 truncate">${esc(label)}</span>${bar}<span class="w-12 shrink-0 text-right text-xs font-bold text-gray-600 whitespace-nowrap">${n}명</span></div>`;
    }).join('');
-   return `<div class="mt-3 first:mt-0"><p class="text-[11px] font-bold text-gray-500 mb-1.5">${esc(title)}</p>${rows}</div>`;
+   return `<div class="mt-3 first:mt-0"><p class="text-xs font-bold text-gray-500 mb-1.5">${esc(title)}</p>${rows}</div>`;
  }).join('');
 }
 function rankedChoices(items) {
@@ -298,27 +307,27 @@ function renderResultChoices(room) {
  const rows=groups.map(({id,title,items})=>{
    let content;
    if(id==='styles'||id==='atmospheres') content=esc(rankedChoices(items));
-   else if(id==='signals') content=`<ul class="flex flex-wrap gap-1">${items.map(([label])=>`<li class="rounded-md border border-[#f4dfe1] bg-white px-1.5 py-0.5 text-[11px]">${esc(label)}</li>`).join('')}</ul>`;
+   else if(id==='signals') content=`<ul class="flex flex-wrap gap-1">${items.map(([label])=>`<li class="rounded-md border border-[#f4dfe1] bg-white px-1.5 py-0.5 text-xs">${esc(label)}</li>`).join('')}</ul>`;
    else if(id==='allergies') content=items.map(([label])=>esc(label)).join(', ');
    else content=items.map(([label,n])=>`${esc(label)} ${n}명`).join(', ');
    return `<div class="contents"><dt class="flex items-baseline justify-between gap-2 whitespace-nowrap font-semibold"><span>${esc(title)}</span><span aria-hidden="true" class="text-gray-400">|</span></dt><dd class="min-w-0 break-words">${content}</dd></div>`;
  }).join('');
- return `<details id="result-choices" class="mt-2"><summary class="py-1 text-xs font-bold text-[#bd2333] cursor-pointer">모두(${total}명)의 선택 확인하기</summary>
+ return `<details id="result-choices" class="mt-2"><summary class="py-1 text-xs font-bold text-[#a9283b] cursor-pointer">모두(${total}명)의 선택 확인하기</summary>
  ${rows?`<dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5 pt-1 pb-2 text-xs leading-5 text-gray-700">${rows}</dl>`:'<p class="py-1 text-xs text-gray-500">아직 선택한 조건이 없어요.</p>'}</details>`;
 }
 function renderPage5() { const room=STATE.room; const people=room?.participants || []; const share=location.origin+'/r/'+encodeURIComponent(STATE.id);
  const target=Number.isInteger(room?.target_size) && room.target_size>=2 && room.target_size<=30 ? room.target_size : null;
  const count=people.length; const full=target===null || count>=target; const progress=target===null?null:Math.min(100,Math.round(count/target*100));
  const place=[fixedRegion()||room?.summary?.region, STATE.options.place_types[fixedType()||room?.summary?.place_type]].filter(Boolean).join(' · ');
- return `<div class="flex-1 flex flex-col justify-between p-5 page-enter"><div><div class="p-5 rounded-3xl bg-gradient-to-br from-[#bd2333] to-[#981926] text-white shadow-lg"><span class="text-xs font-semibold">모임 현황 · 5초마다 갱신${place?` · 📍 ${esc(place)}`:''}</span><h2 class="text-xl font-extrabold mt-2">${target!==null&&count>=target?'모두 참여했어요!':target!==null?'참여를 기다리고 있어요':'함께 선택하고 있어요'}</h2><p class="text-sm font-bold mt-2">${count}명 참여</p>${target!==null?`<div class="w-full h-2 bg-black/20 rounded-full mt-3 overflow-hidden" role="progressbar" aria-label="모임 참여 현황" aria-valuemin="0" aria-valuemax="${target}" aria-valuenow="${Math.min(count,target)}"><div class="h-full rounded-full bg-white" style="width:${progress}%"></div></div>`:''}<p class="text-xs mt-3 text-white/85">${full?'모두의 조건으로 추천을 볼 수 있어요.':`${target-count}명이 더 참여하면 추천을 볼 수 있어요. 지금은 모인 결과만 보여요.`}</p></div>
+ return `<div class="flex-1 flex flex-col justify-between p-5 page-enter"><div><div class="p-5 rounded-3xl choice-highlight text-white"><span class="text-xs font-semibold">모임 현황${place?` · 📍 ${esc(place)}`:''}</span><h2 class="text-xl font-bold mt-2">${target!==null&&count>=target?'모두 참여했어요!':target!==null?'참여를 기다리고 있어요':'함께 선택하고 있어요'}</h2><p class="text-sm font-bold mt-2">${count}명 참여</p>${target!==null?`<div class="w-full h-2 bg-black/20 rounded-full mt-3 overflow-hidden" role="progressbar" aria-label="모임 참여 현황" aria-valuemin="0" aria-valuemax="${target}" aria-valuenow="${Math.min(count,target)}"><div class="h-full rounded-full bg-white" style="width:${progress}%"></div></div>`:''}<p class="text-xs mt-3 text-white/85">${full?'모두의 조건으로 추천을 볼 수 있어요.':`${target-count}명이 더 참여하면 추천을 볼 수 있어요. 지금은 모인 결과만 보여요.`}</p></div>
  <div class="mt-4 p-3.5 rounded-2xl bg-gray-50 border border-gray-200"><label for="share-link" class="block text-xs font-bold text-gray-700 mb-2">모임 초대 링크</label><div class="flex gap-2"><input id="share-link" readonly value="${esc(share)}" class="flex-1 min-w-0 px-3 py-2 rounded-xl border border-gray-200 text-xs"><button type="button" onclick="copyLink()" class="px-3 py-2 bg-white border border-gray-300 text-gray-800 rounded-xl text-xs font-bold">복사</button>
- <button type="button" onclick="shareLink()" class="px-3 py-2 rounded-xl bg-[#FEE500] text-[#191919] text-xs font-extrabold">${STATE.options.kakao_js_key?'카카오톡 공유':'공유하기'}</button></div></div>
- <details id="group-choices" class="mt-5 rounded-2xl bg-[#fdf2f3] border border-[#f4dfe1]"><summary class="p-3.5 cursor-pointer text-sm font-extrabold">지금까지 모인 조건</summary><div class="px-3.5 pb-3.5">${renderChoices(room)}</div></details>
+ <button type="button" onclick="shareLink()" class="px-3 py-2 rounded-xl bg-[#FEE500] text-[#191919] text-xs font-bold">${STATE.options.kakao_js_key?'카카오톡 공유':'공유하기'}</button></div></div>
+ <details id="group-choices" class="mt-5 rounded-2xl bg-[#fdf2f3] border border-[#f4dfe1]"><summary class="p-3.5 cursor-pointer text-sm font-bold">지금까지 모인 조건</summary><div class="px-3.5 pb-3.5">${renderChoices(room)}</div></details>
  <p id="group-status" class="text-xs text-red-700 mt-3">${esc(STATE.error)}</p></div>
- <div class="mt-5 space-y-2">${full?`<button type="button" onclick="openResults()" class="w-full py-3.5 rounded-2xl bg-[#bd2333] text-white font-bold text-sm">모두의 조건으로 추천받기 →</button>`:`<p class="w-full py-3.5 rounded-2xl bg-gray-100 text-gray-500 font-bold text-sm text-center">추천은 ${target}명이 모두 참여하면 열려요</p>`}
+ <div class="mt-5 space-y-2">${full?`<button type="button" onclick="openResults()" class="w-full py-3.5 rounded-2xl bg-[#a9283b] text-white font-bold text-sm">모두의 조건으로 추천받기 →</button>`:`<p class="w-full py-3.5 rounded-2xl bg-gray-100 text-gray-500 font-bold text-sm text-center">추천은 ${target}명이 모두 참여하면 열려요</p>`}
  <button type="button" onclick="editMe()" ${target!==null&&count>=target&&!STATE.me?'disabled':''} class="w-full py-3 rounded-2xl border border-gray-200 text-gray-700 font-bold text-xs disabled:opacity-50">${STATE.me?'내 조건 수정':target!==null&&count>=target?'참여 인원이 마감됐어요':'참여하기'}</button>${STATE.me?'<button type="button" onclick="deleteMe()" class="w-full py-2 text-gray-500 text-xs underline">내 응답 삭제</button>':''}
  ${STATE.host?renderResetBox():''}</div></div>`; }
-function renderResetBox() { return STATE.confirmReset ? `<dialog id="reset-dialog" oncancel="cancelReset()" aria-labelledby="reset-title" class="w-[90%] max-w-sm p-4 rounded-2xl border-2 border-red-300 bg-red-50 backdrop:bg-black/40"><p id="reset-title" class="text-sm font-extrabold text-red-800">💣 정말 모임을 초기화할까요?</p><p class="text-xs text-red-800 mt-2">방과 모든 참여자의 응답이 <strong>완전히 사라지고</strong>, 공유한 초대 링크도 더 이상 열리지 않아요. 되돌릴 수 없어요.</p><div class="grid grid-cols-2 gap-2 mt-3"><button type="button" onclick="cancelReset()" autofocus class="py-2.5 rounded-xl border border-gray-300 bg-white text-xs font-bold text-gray-700">취소</button><button type="button" onclick="resetRoom()" class="py-2.5 rounded-xl bg-red-700 text-white text-xs font-extrabold">초기화하기</button></div></dialog>`
+function renderResetBox() { return STATE.confirmReset ? `<dialog id="reset-dialog" oncancel="cancelReset()" aria-labelledby="reset-title" class="w-[90%] max-w-sm p-4 rounded-2xl border-2 border-red-300 bg-red-50 backdrop:bg-black/40"><p id="reset-title" class="text-sm font-bold text-red-800">정말 모임을 초기화할까요?</p><p class="text-xs text-red-800 mt-2">방과 모든 참여자의 응답이 <strong>완전히 사라지고</strong>, 공유한 초대 링크도 더 이상 열리지 않아요. 되돌릴 수 없어요.</p><div class="grid grid-cols-2 gap-2 mt-3"><button type="button" onclick="cancelReset()" autofocus class="py-2.5 rounded-xl border border-gray-300 bg-white text-xs font-bold text-gray-700">취소</button><button type="button" onclick="resetRoom()" class="py-2.5 rounded-xl bg-red-700 text-white text-xs font-bold">초기화하기</button></div></dialog>`
   : `<button type="button" onclick="askReset()" class="w-full py-2 text-red-700 text-xs font-bold">방장 · 모임 초기화</button>`; }
 function askReset() { STATE.confirmReset=true; renderApp(); }
 function cancelReset() { STATE.confirmReset=false; renderApp(); }
@@ -344,54 +353,61 @@ function timeLabel(value) {
 }
 function renderResultCard(place, index, source) {
   const top=index<3;
-  const topColors=index===0?'bg-[#bd2333] text-white':'bg-[#fdf2f3] text-[#bd2333]';
+  const topColors=index===0?'bg-[#a9283b] text-white':'bg-[#fdf2f3] text-[#a9283b]';
   const real=source!=='sample' && !place.is_sample;
   const national=top&&real?rankLabel(place.sales_rank,'전국',5):'';
   const ranking=top&&real?(national||rankLabel(place.region_sales_rank,'지역',10)):'';
-  const crown=Boolean(national)&&place.sales_rank<=1;
+
   const signals=real?Object.entries(STATE.options.signal_fields||{}).filter(([,field])=>place[field]===true).map(([label])=>label):[];
   const start=real?timeLabel(place.open):'', end=real?timeLabel(place.close):'';
   const nextDay=start && end && end<start ? ' (다음 날)' : '';
   const link=Boolean(place.eatpl_url);
-  const extra=[...(start&&end?[`<p class="text-xs text-gray-700">예상 운영시간 ${start}~${end}${nextDay} <span class="text-[11px] text-gray-500">(최근 한 달 결제 시각 기준 · 매장에 확인)</span></p>`]:[]),
+  const extra=[...(start&&end?[`<p class="text-xs text-gray-700">예상 운영시간 ${start}~${end}${nextDay} <span class="text-xs text-gray-500">(최근 한 달 결제 시각 기준 · 매장에 확인)</span></p>`]:[]),
    ...(signals.length?[`<p class="text-xs text-gray-700">결제 데이터 기준 · ${esc(signals.join(' · '))}</p>`]:[]),
-   `<p class="text-[11px] text-gray-500">${place.estimate?.menu_price?'가격: 잇플 상세 메뉴 조합': '가격: 업종 기준 추정'}</p>`];
-  return `<div class="p-4 rounded-3xl border-2 ${top?'border-[#bd2333]':'border-gray-100'} shadow-sm bg-white">
-    <div class="flex flex-wrap items-center gap-2">${top?`<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full ${topColors} text-[11px] font-bold">${crown?'<span role="img" aria-label="전국 매출 상위 1% 이내" class="text-sm leading-none">👑</span>':''}#${index+1} 오늘의 추천</span>`:`<span class="w-7 h-7 rounded-lg bg-gray-900 text-white text-xs font-bold flex items-center justify-center">${index+1}</span>`}
-      ${ranking?`<span class="inline-flex items-center whitespace-nowrap rounded-full border border-[#bd2333] px-2.5 py-1 text-[11px] font-semibold text-gray-700">${esc(ranking)}</span>`:''}</div>
-    <div class="flex items-baseline flex-wrap gap-2 mt-3"><strong class="text-base font-extrabold text-gray-900">${esc(place.name)}</strong><span class="text-xs text-gray-500">${esc(place.business_type||'')}</span></div>
+   `<p class="text-xs text-gray-500">${place.estimate?.menu_price?'가격: 잇플 상세 메뉴 조합': '가격: 업종 기준 추정'}</p>`];
+  return `<div class="place-card ${index===0?'is-featured':''} p-4 rounded-3xl border border-gray-200 bg-white">
+    <div class="flex flex-wrap items-center gap-2">${top?`<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full ${topColors} text-xs font-bold">${index+1}순위 추천</span>`:`<span class="w-7 h-7 rounded-lg bg-gray-900 text-white text-xs font-bold flex items-center justify-center">${index+1}</span>`}
+      ${ranking?`<span class="inline-flex items-center whitespace-nowrap rounded-full border border-[#a9283b] px-2.5 py-1 text-xs font-semibold text-gray-700">${esc(ranking)}</span>`:''}</div>
+    <div class="flex items-baseline flex-wrap gap-2 mt-3"><strong class="text-base font-bold text-gray-900">${esc(place.name)}</strong><span class="text-xs text-gray-500">${esc(place.business_type||'')}</span></div>
     ${place.address?`<p class="text-xs text-gray-500 mt-2">${esc(place.address)}</p>`:''}
     ${Number.isInteger(place.distance_m)?`<p class="text-xs text-gray-600 mt-1">역에서 직선 약 ${place.distance_m}m</p>`:''}
-    ${place.estimate?.dessert_items?.length?`<p class="mt-2 text-xs font-bold text-[#bd2333]">잇플 메뉴 확인 · ${esc(place.estimate.dessert_items.join(', '))}</p>`:''}
-    <details id="result-match-${esc(place.id)}" class="mt-3 rounded-xl bg-transparent"><summary class="px-3 pt-4 pb-1 text-[11px] font-bold text-gray-600 cursor-pointer">일치하는 취향 보기</summary>
+    ${place.estimate?.dessert_items?.length?`<p class="mt-2 text-xs font-bold text-[#a9283b]">잇플 메뉴 확인 · ${esc(place.estimate.dessert_items.join(', '))}</p>`:''}
+    <details id="result-match-${esc(place.id)}" class="mt-3 rounded-xl bg-transparent"><summary class="px-3 pt-4 pb-1 text-xs font-bold text-gray-600 cursor-pointer">일치하는 취향 보기</summary>
       <div class="px-3 pb-3 space-y-1">${(place.reasons||[]).map(reason=>`<p class="text-xs text-gray-700">• ${esc(compactMatchReason(reason))}</p>`).join('') || '<p class="text-xs text-gray-500">고른 조건과 겹치는 정보가 적어, 이 지역에서 많이 찾는 곳으로 추천했어요.</p>'}</div></details>
-    <details class="rounded-xl bg-transparent"><summary class="px-3 py-2 text-[11px] font-bold text-gray-600 cursor-pointer">추가 정보</summary><div class="px-3 pb-3 space-y-1">${extra.join('')}</div></details>
+    <details class="rounded-xl bg-transparent"><summary class="px-3 py-2 text-xs font-bold text-gray-600 cursor-pointer">추가 정보</summary><div class="px-3 pb-3 space-y-1">${extra.join('')}</div></details>
     ${place.cautions?.length?`<div class="mt-2 space-y-1">${place.cautions.map(caution=>`<p class="text-xs text-red-700">${esc(caution)}</p>`).join('')}</div>`:''}
-    ${link?`<a href="${esc(place.eatpl_url)}" target="_blank" rel="noopener" class="mt-3 block w-full py-3 rounded-2xl ${top?topColors:'bg-gray-900 text-white'} text-center text-sm font-extrabold">메뉴·혼잡도 확인하기 ↗</a>`:`<p class="mt-3 text-center text-[11px] text-gray-500">${source==='sample'?'가상 가게 · 잇플 링크 없음':'잇플 링크 없음'}</p>`}</div>`;
+    ${link?`<a href="${esc(place.eatpl_url)}" target="_blank" rel="noopener" class="place-link mt-3 block w-full py-3 rounded-2xl text-center text-sm font-bold">메뉴·혼잡도 확인하기 ↗</a>`:`<p class="mt-3 text-center text-xs text-gray-500">${source==='sample'?'가상 가게 · 잇플 링크 없음':'잇플 링크 없음'}</p>`}</div>`;
 }
 const HOW_WE_RECOMMEND = `<ul class="space-y-1.5 text-xs text-gray-700 list-disc pl-4">
  <li><strong>후보:</strong> 정한 지역의 잇플(BC카드) 가맹점을 최근 1개월 결제 매출 순으로 가져와요.</li>
  <li><strong>제외:</strong> 누구 한 명이라도 가진 알레르기 위험이 높은 곳은 빼요.</li>
  <li><strong>점수:</strong> 같은 종류를 원한 사람이 많을수록, 예산에 맞는 사람이 많을수록, 원하는 분위기·맛집 유형이 맞을수록 위로 올려요.</li>
  <li><strong>근거:</strong> 분위기는 잇플 후기 요약과 편의 안내를 확인해 반영해요. 가격은 메뉴 정보나 업종 추정을 써요. 점수가 같으면 결제 매출이 높은 곳이 먼저예요.</li></ul>`;
+function humanizeRecommendationWarning(message) {
+  if (typeof message !== 'string') return '';
+  if (message.includes('OPENROUTER_API_KEY')) {
+    return '일부 상세 정보가 없어 업종을 기준으로 추천했어요. 가격과 분위기는 방문 전에 확인해 주세요.';
+  }
+  return message;
+}
 function renderPage6() { const data=STATE.result; const solo=STATE.resultBackPage===4; let body='';
  const region=data?.region || fixedRegion() || STATE.location, type=data?.place_type || fixedType() || STATE.placeType;
- if(data?.status==='ok') body=`<div class="mt-5"><div class="flex items-center justify-between gap-2"><h3 class="min-w-0 break-words text-2xl font-extrabold text-gray-900"><span aria-hidden="true">📍</span> ${esc(region)} · ${esc(STATE.options.place_types[type]||'')}</h3><span class="shrink-0 text-[11px] text-gray-500">${data.source==='sample'?'가상 샘플':'eat.pl 잇플'}</span></div>${data.source!=='sample'?'<p class="text-[11px] text-gray-500 mt-1">결제 지표: 잇플 · BC카드 최근 1개월 결제 데이터 기반</p>':''}
+ if(data?.status==='ok') body=`<div class="mt-5"><div class="flex items-center justify-between gap-2"><h3 class="min-w-0 break-words text-2xl font-bold text-gray-900">${esc(region)} · ${esc(STATE.options.place_types[type]||'')}</h3><span class="shrink-0 text-xs text-gray-500">${data.source==='sample'?'가상 샘플':'eat.pl 잇플'}</span></div>${data.source!=='sample'?'<p class="text-xs text-gray-500 mt-1">결제 지표: 잇플 · BC카드 최근 1개월 결제 데이터 기반</p>':''}
   <div class="mt-3 space-y-3">${data.results.map((r,i)=>renderResultCard(r,i,data.source)).join('')}</div></div>`;
  else if(data) body=`<p class="mt-5 p-4 rounded-2xl bg-gray-50 text-sm text-gray-600">${esc(data.message||'결과가 없어요. 조건을 바꿔 주세요.')}</p>`;
  let status=esc(STATE.error);
  if(!status) {
    if(STATE.loading) status='가게를 찾고 있어요…';
    else if(data?.details_pending) status='잇플 상세 메뉴와 후기를 확인하는 중이에요...';
-   else if(data?.ai_pending) status='AI가 메뉴와 후기에서 장소 종류를 확인하는 중이에요... (최대 <span class="ai-estimate-duration">n분</span>)';
-   else if(data?.status==='ok' || data?.status==='empty') status=solo?'당신의 취향을 반영했어요':'모두의 취향을 반영했어요';
+   else if(data?.ai_pending) status='메뉴와 후기를 더 확인하고 있어요… 잠시 후 추천이 업데이트돼요.';
+   else if(data?.status==='ok' || data?.status==='empty') status=solo?'선택한 조건으로 추천했어요':'모두가 선택한 조건으로 추천했어요';
  }
- return `<div class="flex-1 p-5 page-enter"><h2 class="text-2xl font-extrabold mt-3">어디로 갈까요?</h2><p id="result-status" role="status" class="text-xs text-gray-500 mt-2">${status}</p>
+ return `<div class="flex-1 p-5 page-enter"><h2 class="text-2xl font-bold mt-3">어디로 갈까요?</h2><p id="result-status" role="status" class="text-xs text-gray-500 mt-2">${status}</p>
  ${data?.station_radius_m?`<p class="text-xs text-gray-600 mt-2">역 중심에서 직선 반경 ${data.station_radius_m}m</p>`:''}
  ${solo?'':renderResultChoices(STATE.room)}
- ${(data?.warnings||[]).map(w=>`<p class="text-xs text-amber-800 mt-2">${esc(w)}</p>`).join('')}${body}
+ ${(data?.warnings||[]).map(w=>`<p class="text-xs text-amber-800 mt-2">${esc(humanizeRecommendationWarning(w))}</p>`).join('')}${body}
  ${data?.excluded?.length?`<details class="mt-4 text-xs"><summary class="font-bold">알레르기 위험 신호로 제외된 곳 (${data.excluded.length})</summary>${data.excluded.map(p=>`<p class="mt-1">${esc(p.name)} · ${esc(p.reason)}</p>`).join('')}</details>`:''}
- <p class="text-[11px] text-gray-500 mt-5">가격과 이용 조건은 매장에 확인해 주세요. 알레르기가 있다면 실제 재료도 확인해 주세요.</p><button type="button" onclick="goBack()" class="mt-5 text-xs font-bold text-[#bd2333]">← ${solo?'조건 다시 고르기':'참여 현황으로'}</button>
+ <p class="text-xs text-gray-500 mt-5">가격과 이용 조건은 매장에 확인해 주세요. 알레르기가 있다면 실제 재료도 확인해 주세요.</p><button type="button" onclick="goBack()" class="mt-5 text-xs font-bold text-[#a9283b]">← ${solo?'조건 다시 고르기':'참여 현황으로'}</button>
  ${data?.status==='ok'?`<details id="result-how" class="mt-2 rounded-2xl border border-gray-200"><summary class="px-3.5 py-2.5 text-xs font-bold text-gray-700 cursor-pointer">어떻게 추천했나요?</summary><div class="px-3.5 pb-3">${HOW_WE_RECOMMEND}</div></details>`:''}</div>`; }
 function renderApp() { const header=$('app-header'); header.classList.toggle('hidden',STATE.currentPage===1);
  const back=$('back-btn');
@@ -484,13 +500,13 @@ function renderRoomLoadError(error) {
     saveHost(null);
     const link = document.createElement('a');
     link.href = '/';
-    link.className = 'mt-6 px-5 py-3 rounded-2xl bg-[#bd2333] text-white text-sm font-bold';
+    link.className = 'mt-6 px-5 py-3 rounded-2xl bg-[#a9283b] text-white text-sm font-bold';
     link.textContent = '새 모임 만들기';
     panel.append(link);
   } else {
     const retry = document.createElement('button');
     retry.type = 'button';
-    retry.className = 'mt-6 px-5 py-3 rounded-2xl bg-[#bd2333] text-white text-sm font-bold';
+    retry.className = 'mt-6 px-5 py-3 rounded-2xl bg-[#a9283b] text-white text-sm font-bold';
     retry.textContent = '다시 시도';
     retry.addEventListener('click', () => location.reload());
     panel.append(retry);

@@ -1,148 +1,62 @@
 function renderPage1() {
-  const marqueeRows = [
-    { emojis: '🍚 🍜 🍣 🥩 🍲 🍕 🍔 🌮 🥟 🍝 🍛 🍱 🥗 🍢 🍤', dir: 'animate-marquee-left' },
-    { emojis: '☕ 🍰 🥐 🍨 🧇 🍩 🧋 🍓 🥞 🧁 🍪 🥧 🍮 🍵 🍫', dir: 'animate-marquee-right' },
-    { emojis: '🍺 🥂 🍷 🍸 🥃 🍻 🍶 🍾 🍢 🍗 🧀 🥨 🍤 🥟 🍲', dir: 'animate-marquee-left-slow' },
-    { emojis: '🥘 🍖 🍤 🍜 🍣 🍕 🌮 🥗 🍱 🍛 🍚 🥩 🥟 🍝 🍔', dir: 'animate-marquee-right-slow' },
-    { emojis: '🧋 ☕ 🍰 🍦 🥐 🍓 🥞 🧇 🍩 🧁 🍮 🍵 🍪 🥧 🍫', dir: 'animate-marquee-left' },
-    { emojis: '🍻 🥂 🍸 🍷 🍺 🍗 🍢 🧀 🍤 🥟 🥨 🍾 🍶 🥃 🍲', dir: 'animate-marquee-right' },
-    { emojis: '🍱 🍛 🍚 🍜 🍣 🥩 🍲 🍕 🍔 🌮 🥟 🍝 🥗 🍢 🍤', dir: 'animate-marquee-left-slow' }
-  ];
-
-  const rowsHtml = marqueeRows.map((row) => `
-    <div class="overflow-hidden whitespace-nowrap select-none opacity-25 py-1.5">
-      <div class="${row.dir} text-2xl sm:text-3xl tracking-widest">
-        <span class="mx-2">${row.emojis}</span>
-        <span class="mx-2">${row.emojis}</span>
-      </div>
-    </div>
-  `).join('');
-
   return `
-    <div class="relative flex-1 flex flex-col justify-between min-h-screen lg:min-h-[780px] bg-white overflow-hidden page-enter">
-      <!-- 7-Row Animated Food Emoji Marquee Background -->
-      <div aria-hidden="true" class="absolute inset-0 flex flex-col justify-between py-4 pointer-events-none z-0">
-        ${rowsHtml}
-      </div>
+    <div class="home-shell page-enter">
+      <header class="home-top">
+        <span class="home-brand"><span class="home-brand-mark" aria-hidden="true">●</span> 지금어디가</span>
+        <span class="home-source">eat.pl 데이터 기반</span>
+      </header>
 
-      <!-- Soft Radial White Veil for Crisp Legibility -->
-      <div aria-hidden="true" class="absolute inset-0 bg-gradient-to-b from-white/75 via-white/92 to-white/95 z-0 pointer-events-none"></div>
-
-      <!-- Top Attribution Pill -->
-      <div class="relative z-10 pt-7 px-5 flex items-center justify-between">
-        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#fdf2f3] border border-[#bd2333]/15 text-[#bd2333] text-xs font-bold shadow-xs">
-          <span class="w-1.5 h-1.5 rounded-full bg-[#bd2333]"></span>
-          함께 고르는 카페 · 식당 · 술집
-        </span>
-        <span class="text-[11px] font-semibold text-gray-400"> eat.pl · BC카드 기반 서비스</span>
-      </div>
-
-      <!-- Centered Brand Hero & Location Search Bar -->
-      <div class="relative z-10 px-5 my-auto py-8 flex flex-col items-center text-center">
-        <!-- Custom Rice-Bowl Emblem -->
-        <div class="w-16 h-16 rounded-3xl bg-[#bd2333] shadow-lg shadow-[#bd2333]/25 flex items-center justify-center mb-4">
-          <svg class="w-9 h-9 text-white" viewBox="0 0 24 24" fill="none">
-            <path d="M7 5.5C7 4.5 7.8 4 7.8 3M12 5C12 4 12.8 3.5 12.8 2.5M17 5.5C17 4.5 17.8 4 17.8 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-            <path d="M5 12C5 9.2 8.1 7.5 12 7.5C15.9 7.5 19 9.2 19 12" fill="currentColor" fill-opacity="0.25" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-            <path d="M3.5 12H20.5C20.5 16.4 16.9 19.5 12 19.5C7.1 19.5 3.5 16.4 3.5 12Z" fill="currentColor"/>
-            <path d="M8.5 19.5H15.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <section class="home-intro" aria-labelledby="home-title">
+        <div class="home-illustration" aria-hidden="true">
+          <svg viewBox="0 0 320 124" role="presentation" focusable="false">
+            <path d="M74 64 C104 64 116 32 151 55 M74 64 C108 66 118 91 151 66 M244 64 C217 64 205 37 171 55" fill="none" stroke="#d6cac5" stroke-width="2" stroke-linecap="round" stroke-dasharray="3 7"/>
+            <circle cx="67" cy="64" r="22" fill="#f4f0ec" stroke="#dfd6d0"/>
+            <circle cx="249" cy="64" r="22" fill="#f4f0ec" stroke="#dfd6d0"/>
+            <circle cx="160" cy="60" r="30" fill="#a9283b"/>
+            <path d="M148 60c0-7 5-12 12-12s12 5 12 12c0 10-12 20-12 20s-12-10-12-20z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/>
+            <circle cx="160" cy="59" r="4.5" fill="#fff"/>
+            <path d="M58 69c0-7 18-7 18 0M67 60a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM240 69c0-7 18-7 18 0M249 60a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" fill="none" stroke="#87756e" stroke-width="1.8" stroke-linecap="round"/>
+            <circle cx="112" cy="26" r="4" fill="#b18d85"/>
+            <circle cx="214" cy="99" r="4" fill="#b18d85"/>
           </svg>
         </div>
+        <p class="home-kicker">우리 모임, 어디서 만날까?</p>
+        <h1 id="home-title" class="home-title">취향은 달라도,<br><span>장소는 함께 고르자.</span></h1>
+        <p class="home-description">동네를 정하고 각자 원하는 조건을 모으면<br>우리에게 맞는 카페·식당·술집을 추천해요.</p>
+      </section>
 
-        <h1 class="text-3xl sm:text-4xl font-black tracking-tight text-gray-900">
-          지금어디가
-        </h1>
-        <p class="mt-2 text-sm sm:text-base font-medium text-gray-600 leading-relaxed max-w-xs">
-          서로 다른 취향을 함께 모아<br />
-          <span class="text-[#bd2333] font-bold">우리 모임에 어울리는 장소 찾기</span>
-        </p>
-
-        <!-- Search Input Card -->
-        <div class="w-full mt-7 bg-white rounded-3xl p-4 shadow-xl shadow-gray-200/70 border border-gray-100 text-left">
-          <label for="location-input" class="block text-xs font-bold text-gray-500 mb-2 px-1">
-            어느 동네·역 근처에서 찾으시나요?
-          </label>
-
-          <div class="relative flex items-center">
-            <span class="absolute left-3.5 text-gray-400 pointer-events-none">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
-              </svg>
-            </span>
-            <input
-              id="location-input"
-              type="text"
-              value="${esc(STATE.location)}"
-              placeholder="어디에서 먹을까요?"
-              oninput="handleLocationInput(this.value)"
-              onkeydown="if(event.key==='Enter' && !event.isComposing) submitPage1()"
-              class="w-full pl-11 pr-20 py-3.5 rounded-2xl bg-gray-50 border border-gray-200 focus:bg-white focus:border-[#bd2333] focus:ring-2 focus:ring-[#bd2333]/15 text-sm font-semibold text-gray-900 placeholder-gray-400 outline-none transition"
-            />
-
-            <!-- Clear input button -->
-            <button
-              id="loc-clear-btn"
-              type="button"
-              onclick="clearLocationInput()"
-              aria-label="입력 지우기"
-              class="${STATE.location ? '' : 'hidden'} absolute right-11 p-1.5 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-200/70 transition"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-
-
-          </div>
-
-          <div id="region-choices" class="mt-2" aria-live="polite"></div>
-
-          <!-- Quick District Chips -->
-          <div class="mt-3">
-            <div class="flex items-center justify-between px-1 mb-1.5">
-              <span class="text-[11px] font-semibold text-gray-400">인기 상권 빠르게 선택하기</span>
-
-            </div>
-            <div class="flex flex-wrap gap-1.5">
-              ${QUICK_DISTRICTS.map(d => {
-                const active = STATE.location === d;
-                return `
-                  <button
-                    type="button"
-                    onclick="selectQuickDistrict('${d}')"
-                    class="px-2.5 py-1.5 rounded-xl text-xs font-semibold transition ${
-                      active
-                        ? 'bg-[#bd2333] text-white shadow-xs'
-                        : 'bg-gray-100 hover:bg-gray-200/80 text-gray-700'
-                    }"
-                  >
-                    ${d}
-                  </button>
-                `;
-              }).join('')}
-            </div>
-          </div>
-
-          <!-- Start CTA -->
-          <button
-            type="button"
-            onclick="submitPage1()"
-            class="w-full mt-4 py-3.5 rounded-2xl bg-[#bd2333] hover:bg-[#9e1b29] active:scale-[0.99] text-white font-bold text-sm shadow-md shadow-[#bd2333]/25 transition flex items-center justify-center gap-1.5"
-          >
-            <span>이 위치로 맛집 찾기</span>
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
+      <section class="home-search" aria-label="모임 장소 정하기">
+        <label for="location-input" class="home-label">어디에서 만날까요?</label>
+        <div class="home-input-wrap">
+          <svg aria-hidden="true" viewBox="0 0 24 24" class="home-search-icon" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/>
+          </svg>
+          <input id="location-input" type="text" autocomplete="off"
+            value="${esc(STATE.location)}" placeholder="동네 또는 지하철역"
+            oninput="handleLocationInput(this.value)"
+            onkeydown="if(event.key==='Enter' && !event.isComposing) submitPage1()"
+            class="home-input" />
+          <button id="loc-clear-btn" type="button" onclick="clearLocationInput()"
+            aria-label="입력 지우기" class="home-input-clear ${STATE.location ? '' : 'hidden'}">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
           </button>
         </div>
-      </div>
+        <div id="region-choices" class="home-region-choices" aria-live="polite"></div>
+        <p class="home-quick-label">자주 찾는 지역</p>
+        <div class="home-quick-chips" role="group" aria-label="자주 찾는 지역">
+          ${QUICK_DISTRICTS.map(d => `
+            <button type="button" onclick="selectQuickDistrict('${d}')" aria-pressed="${STATE.location===d}"
+              class="home-quick-chip ${STATE.location===d?'is-selected':''}">${d}</button>
+          `).join('')}
+        </div>
+        <button type="button" class="home-start" onclick="submitPage1()">
+          이 동네에서 시작하기
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 5 7 7-7 7"/></svg>
+        </button>
+        <p class="home-helper">다음 화면에서 혼자 고를지, 함께 고를지 선택해요.</p>
+      </section>
 
-      <!-- Bottom Footer -->
-      <div class="relative z-10 pb-5 px-5 text-center">
-        <p class="text-[11px] font-medium text-gray-400">
-          JJ2YA · 함께 고르는 맛집 - 지금 어디가
-        </p>
-      </div>
+      <footer class="home-footer">별도 로그인 없이 · 링크로 함께 선택</footer>
     </div>
   `;
 }
