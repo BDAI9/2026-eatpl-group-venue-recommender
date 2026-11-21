@@ -23,6 +23,8 @@ jobs:
         run: python -m compileall -q moim
       - name: Run tests
         run: python -m pytest -q
+      - name: Compile deployment preflight
+        run: python -m py_compile deploy/check_production.py
       - name: Syntax-check JavaScript
         run: |
           node --check web/v2.js
@@ -67,3 +69,17 @@ jobs:
           python-version: '3.11'
       - name: Check provider queries without API credentials
         run: PYTHONPATH=. python tests/smoke_live.py
+
+  production-readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    # This reads the PREVIOUS live deployment. It is advisory and never
+    # creates rooms or turns a CI-green preview into a production claim.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Read-only health, CORS, and frontend preflight
+        run: python deploy/check_production.py
