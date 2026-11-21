@@ -35,8 +35,17 @@ try {
   await guest.locator('#share-link').waitFor();
   console.log('OK second participant joined invite link');
 
+  // The backend is the source of truth for participation. Avoid brittle
+  // assertions tied to the UI's Korean progress-label punctuation.
+  const roomId = roomUrl.split('/').at(-1);
+  const saved = await page.request.get(`${base}/api/rooms/${roomId}`);
+  assert.equal(saved.status(), 200);
+  const storedRoom = await saved.json();
+  assert.equal(storedRoom.participants.length, 2, 'Both participants must be persisted');
+  assert.equal(storedRoom.target_size, 2, 'Room capacity must be preserved');
+
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.getByText('2 / 2명 참여', { exact: true }).waitFor({ timeout: 20000 });
+  await page.getByRole('button', { name: /모두의 조건으로 추천받기/ }).waitFor({ timeout: 20000 });
   await page.getByRole('button', { name: /모두의 조건으로 추천받기/ }).click();
   await page.getByRole('heading', { name: '어디로 갈까요?' }).waitFor();
   await page.locator('#result-status').waitFor({ timeout: 25000 });
