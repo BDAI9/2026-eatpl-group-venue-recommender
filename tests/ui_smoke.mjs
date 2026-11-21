@@ -36,10 +36,10 @@ try {
   console.log('OK second participant joined invite link');
 
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.getByText('2명 참여', { exact: true }).waitFor({ timeout: 20000 });
+  await page.getByText('2 / 2명 참여', { exact: true }).waitFor({ timeout: 20000 });
   await page.getByRole('button', { name: /모두의 조건으로 추천받기/ }).click();
   await page.getByRole('heading', { name: '어디로 갈까요?' }).waitFor();
-  await page.waitForFunction(() => !window.STATE?.loading, { timeout: 25000 });
+  await page.locator('#result-status').waitFor({ timeout: 25000 });
   const result = await page.locator('#page-viewport').innerText();
   assert.match(result, /추천|장소/);
   assert.ok(!errors.length, 'Browser JavaScript exceptions: ' + errors.join(' | '));
