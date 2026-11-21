@@ -84,6 +84,16 @@ try {
 
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: /모두의 조건으로 추천받기/ }).waitFor({ timeout: 20000 });
+  // The 5-second polling loop must NOT replace the room DOM when the response is unchanged.
+  await page.locator('#group-choices').evaluate(el => {
+    el.open = true;
+    window.__stableShareInput = document.querySelector('#share-link');
+  });
+  await page.waitForTimeout(6200);
+  assert.equal(await page.evaluate(() => document.querySelector('#share-link') === window.__stableShareInput),
+    true, 'Unchanged 5/6 poll must not rebuild invitation UI');
+  assert.equal(await page.locator('#group-choices').evaluate(el => el.open),
+    true, 'Unchanged poll must preserve expanded participant choices');
   await page.getByRole('button', { name: /모두의 조건으로 추천받기/ }).click();
   await page.getByRole('heading', { name: '어디로 갈까요?' }).waitFor();
   await page.locator('#result-status').waitFor({ timeout: 25000 });
@@ -92,6 +102,29 @@ try {
     el => getComputedStyle(el).display
   );
   assert.equal(disclosure, 'list-item', 'Recommendation explanation must show disclosure marker');
+  // An identical background recommendations response must update status only.
+  await page.locator('#result-how').evaluate(el => {
+    el.open = true;
+    window.__stableResultCard = document.querySelector('.place-card');
+  });
+  await page.evaluate(() => getResults(1, resultRun));
+  assert.equal(await page.evaluate(() => document.querySelector('.place-card') === window.__stableResultCard),
+    true, 'Unchanged 6/6 poll must not rebuild recommendation cards');
+  assert.equal(await page.locator('#result-how').evaluate(el => el.open),
+    true, 'Unchanged 6/6 poll must preserve open explanations');
+  // A background warning update must NOT replace the results card or page heading.
+  await page.evaluate(() => {
+    window.__stableResultHeading = document.querySelector('#page-viewport h2');
+    STATE.result = {...STATE.result, warnings: [...(STATE.result.warnings||[]), '상세 정보 점검 중']};
+    if(!patchResultView()) throw new Error('Patch targets unavailable');
+  });
+  assert.equal(await page.evaluate(() => document.querySelector('#page-viewport h2') === window.__stableResultHeading),
+    true, 'Warning update must keep result heading mounted');
+  assert.equal(await page.evaluate(() => document.querySelector('.place-card') === window.__stableResultCard),
+    true, 'Warning update must not rebuild recommendation cards');
+  assert.equal(await page.locator('#result-how').evaluate(el => el.open),
+    true, 'Warning update must preserve explanation state');
+  assert.match(await page.locator('#result-warnings').innerText(), /상세 정보 점검 중/);
   const result = await page.locator('#page-viewport').innerText();
   assert.match(result, /추천|장소/);
   await page.screenshot({ path: 'artifacts/results-mobile.png', fullPage: true });

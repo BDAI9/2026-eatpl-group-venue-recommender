@@ -374,15 +374,16 @@ function renderResultCard(place, index, source) {
     ${place.estimate?.dessert_items?.length?`<p class="mt-2 text-xs font-bold text-[#a9283b]">잇플 메뉴 확인 · ${esc(place.estimate.dessert_items.join(', '))}</p>`:''}
     <details id="result-match-${esc(place.id)}" class="mt-3 rounded-xl bg-transparent"><summary class="px-3 pt-4 pb-1 text-xs font-bold text-gray-600 cursor-pointer">일치하는 취향 보기</summary>
       <div class="px-3 pb-3 space-y-1">${(place.reasons||[]).map(reason=>`<p class="text-xs text-gray-700">• ${esc(compactMatchReason(reason))}</p>`).join('') || '<p class="text-xs text-gray-500">고른 조건과 겹치는 정보가 적어, 이 지역에서 많이 찾는 곳으로 추천했어요.</p>'}</div></details>
-    <details class="rounded-xl bg-transparent"><summary class="px-3 py-2 text-xs font-bold text-gray-600 cursor-pointer">추가 정보</summary><div class="px-3 pb-3 space-y-1">${extra.join('')}</div></details>
+    <details id="result-extra-${esc(place.id)}" class="rounded-xl bg-transparent"><summary class="px-3 py-2 text-xs font-bold text-gray-600 cursor-pointer">추가 정보</summary><div class="px-3 pb-3 space-y-1">${extra.join('')}</div></details>
     ${place.cautions?.length?`<div class="mt-2 space-y-1">${place.cautions.map(caution=>`<p class="text-xs text-red-700">${esc(caution)}</p>`).join('')}</div>`:''}
     ${link?`<a href="${esc(place.eatpl_url)}" target="_blank" rel="noopener" class="place-link mt-3 block w-full py-3 rounded-2xl text-center text-sm font-bold">메뉴·혼잡도 확인하기 ↗</a>`:`<p class="mt-3 text-center text-xs text-gray-500">${source==='sample'?'가상 가게 · 잇플 링크 없음':'잇플 링크 없음'}</p>`}</div>`;
 }
 const HOW_WE_RECOMMEND = `<ul class="space-y-1.5 text-xs text-gray-700 list-disc pl-4">
  <li><strong>후보:</strong> 정한 지역의 잇플(BC카드) 가맹점을 최근 1개월 결제 매출 순으로 가져와요.</li>
  <li><strong>제외:</strong> 누구 한 명이라도 가진 알레르기 위험이 높은 곳은 빼요.</li>
- <li><strong>점수:</strong> 같은 종류를 원한 사람이 많을수록, 예산에 맞는 사람이 많을수록, 원하는 분위기·맛집 유형이 맞을수록 위로 올려요.</li>
- <li><strong>근거:</strong> 분위기는 잇플 후기 요약과 편의 안내를 확인해 반영해요. 가격은 메뉴 정보나 업종 추정을 써요. 점수가 같으면 결제 매출이 높은 곳이 먼저예요.</li></ul>`;
+ <li><strong>음식 우선순위:</strong> 식당은 더 많은 사람이 선택한 음식 종류를 먼저 보여줘요. 그 종류가 확인된 매장이 없거나 알레르기 위험이 높으면 다음 선택지를 보여줘요.</li>
+ <li><strong>세부 점수:</strong> 같은 득표수 안에서는 예산·분위기·맛집 유형이 얼마나 맞는지 비교하고, 점수가 같으면 매출 순위로 정해요.</li>
+ <li><strong>근거:</strong> 음식 종류는 잇플 업종과 확인 가능한 상세 정보로 분류해요. 가격은 메뉴 정보나 업종 추정이라 실제와 다를 수 있어요.</li></ul>`;
 function humanizeRecommendationWarning(message) {
   if (typeof message !== 'string') return '';
   if (message.includes('OPENROUTER_API_KEY')) {
@@ -390,26 +391,60 @@ function humanizeRecommendationWarning(message) {
   }
   return message;
 }
+function resultStatusText(data) {
+ if(STATE.error) return STATE.error;
+ if(STATE.loading) return '가게를 찾고 있어요…';
+ if(data?.details_pending) return '잇플 상세 메뉴와 후기를 확인하는 중이에요…';
+ if(data?.ai_pending) return '메뉴와 후기를 더 확인하고 있어요… 잠시 후 추천이 업데이트돼요.';
+ if(data?.status==='ok' || data?.status==='empty')
+   return STATE.resultBackPage===4 ? '선택한 조건으로 추천했어요' : '모두가 선택한 조건으로 추천했어요';
+ return '';
+}
+function resultContentKey(data) {
+ // Progress flags only change the one status line. They do not justify replacing cards.
+ if(!data) return '';
+ const {ai_pending, details_pending, ...visible} = data;
+ return JSON.stringify(visible);
+}
 function renderPage6() { const data=STATE.result; const solo=STATE.resultBackPage===4; let body='';
  const region=data?.region || fixedRegion() || STATE.location, type=data?.place_type || fixedType() || STATE.placeType;
  if(data?.status==='ok') body=`<div class="mt-5"><div class="flex items-center justify-between gap-2"><h3 class="min-w-0 break-words text-2xl font-bold text-gray-900">${esc(region)} · ${esc(STATE.options.place_types[type]||'')}</h3><span class="shrink-0 text-xs text-gray-500">${data.source==='sample'?'가상 샘플':'eat.pl 잇플'}</span></div>${data.source!=='sample'?'<p class="text-xs text-gray-500 mt-1">결제 지표: 잇플 · BC카드 최근 1개월 결제 데이터 기반</p>':''}
   <div class="mt-3 space-y-3">${data.results.map((r,i)=>renderResultCard(r,i,data.source)).join('')}</div></div>`;
  else if(data) body=`<p class="mt-5 p-4 rounded-2xl bg-gray-50 text-sm text-gray-600">${esc(data.message||'결과가 없어요. 조건을 바꿔 주세요.')}</p>`;
- let status=esc(STATE.error);
- if(!status) {
-   if(STATE.loading) status='가게를 찾고 있어요…';
-   else if(data?.details_pending) status='잇플 상세 메뉴와 후기를 확인하는 중이에요...';
-   else if(data?.ai_pending) status='메뉴와 후기를 더 확인하고 있어요… 잠시 후 추천이 업데이트돼요.';
-   else if(data?.status==='ok' || data?.status==='empty') status=solo?'선택한 조건으로 추천했어요':'모두가 선택한 조건으로 추천했어요';
- }
+ const status=esc(resultStatusText(data));
  return `<div class="flex-1 p-5 page-enter"><h2 class="text-2xl font-bold mt-3">어디로 갈까요?</h2><p id="result-status" role="status" class="text-xs text-gray-500 mt-2">${status}</p>
  ${data?.station_radius_m?`<p class="text-xs text-gray-600 mt-2">역 중심에서 직선 반경 ${data.station_radius_m}m</p>`:''}
  ${solo?'':renderResultChoices(STATE.room)}
- ${(data?.warnings||[]).map(w=>`<p class="text-xs text-amber-800 mt-2">${esc(humanizeRecommendationWarning(w))}</p>`).join('')}${body}
- ${data?.excluded?.length?`<details class="mt-4 text-xs"><summary class="font-bold">알레르기 위험 신호로 제외된 곳 (${data.excluded.length})</summary>${data.excluded.map(p=>`<p class="mt-1">${esc(p.name)} · ${esc(p.reason)}</p>`).join('')}</details>`:''}
+ <div id="result-warnings">${(data?.warnings||[]).map(w=>`<p class="text-xs text-amber-800 mt-2">${esc(humanizeRecommendationWarning(w))}</p>`).join('')}</div>
+ <div id="result-body">${body}</div>
+ <div id="result-excluded">${data?.excluded?.length?`<details class="mt-4 text-xs"><summary class="font-bold">알레르기 위험 신호로 제외된 곳 (${data.excluded.length})</summary>${data.excluded.map(p=>`<p class="mt-1">${esc(p.name)} · ${esc(p.reason)}</p>`).join('')}</details>`:''}</div>
  <p class="text-xs text-gray-500 mt-5">가격과 이용 조건은 매장에 확인해 주세요. 알레르기가 있다면 실제 재료도 확인해 주세요.</p><button type="button" onclick="goBack()" class="mt-5 text-xs font-bold text-[#a9283b]">← ${solo?'조건 다시 고르기':'참여 현황으로'}</button>
- ${data?.status==='ok'?`<details id="result-how" class="mt-2 rounded-2xl border border-gray-200"><summary class="px-3.5 py-2.5 text-xs font-bold text-gray-700 cursor-pointer">어떻게 추천했나요?</summary><div class="px-3.5 pb-3">${HOW_WE_RECOMMEND}</div></details>`:''}</div>`; }
-function renderApp() { const header=$('app-header'); header.classList.toggle('hidden',STATE.currentPage===1);
+ <div id="result-how-wrap">${data?.status==='ok'?`<details id="result-how" class="mt-2 rounded-2xl border border-gray-200"><summary class="px-3.5 py-2.5 text-xs font-bold text-gray-700 cursor-pointer">어떻게 추천했나요?</summary><div class="px-3.5 pb-3">${HOW_WE_RECOMMEND}</div></details>`:''}</div></div>`; }
+function patchResultView() {
+ // Keep the 6/6 page, heading and other users' open sections mounted even if
+ // background enrichment changes a shop or warning. Patch only affected regions.
+ const regions=['result-warnings','result-body','result-excluded','result-how-wrap'];
+ if(regions.some(id=>!$(id))) return false;
+ const template=document.createElement('template');
+ template.innerHTML=renderPage6();
+ const scrollY=window.scrollY;
+ for(const id of regions) {
+   const current=$(id);
+   const next=template.content.querySelector('#'+id);
+   if(!next || current.innerHTML===next.innerHTML) continue;
+   const opened=[...current.querySelectorAll('details[id][open]')].map(x=>x.id);
+   current.innerHTML=next.innerHTML;
+   for(const key of opened) {
+     const restored=$(key);
+     if(restored) restored.open=true;
+   }
+ }
+ const status=$('result-status');
+ if(status) status.textContent=resultStatusText(STATE.result);
+ window.scrollTo(0, scrollY);
+ return true;
+}
+function renderApp({quiet=false}={}) { const header=$('app-header'); header.classList.toggle('hidden',STATE.currentPage===1);
  const back=$('back-btn');
  if(back) {
    const locked=isBackLocked();
@@ -421,8 +456,17 @@ function renderApp() { const header=$('app-header'); header.classList.toggle('hi
  const viewport=$('page-viewport');
  const opened=[...viewport.querySelectorAll('details[id][open]')].map(item=>item.id);
  if($('reset-dialog')?.open && STATE.confirmReset && STATE.currentPage===5) return;
+ // Only real room/result changes reach this path. Don't replay the entrance
+ // animation, lose the reading position, or collapse open explanations on refresh.
+ const scrollY=quiet ? window.scrollY : null;
+ const focusedId=quiet && viewport.contains(document.activeElement) ? document.activeElement.id : '';
  viewport.innerHTML=renderer();
  for(const id of opened) { const item=$(id); if(item) item.open=true; }
+ if(quiet) {
+   viewport.querySelector('.page-enter')?.classList.remove('page-enter');
+   if(focusedId) $(focusedId)?.focus({preventScroll:true});
+   if(scrollY!==null) window.scrollTo(0, scrollY);
+ }
  const modal=$('reset-dialog'); if(modal) modal.showModal();
  const form=$('conditions-form'); if(form) form.addEventListener('submit',submitConditions);
  if(STATE.options?.data_source==='sample') { const p=document.createElement('p'); p.className='p-3 bg-amber-50 text-amber-900 text-xs text-center'; p.textContent='가상 샘플 가게로 시험 중입니다.'; $('page-viewport').prepend(p); }
@@ -482,11 +526,35 @@ function showResultsFrom(backPage) {
  STATE.currentPage=6;
  getResults();
 }
-async function getResults(retry=0, run=++resultRun) { STATE.loading=retry===0; STATE.error=''; if(!retry) STATE.result=null; renderApp();
- try { const data=await api(`/api/rooms/${encodeURIComponent(STATE.id)}/recommend`,'POST',{}); if(run!==resultRun) return;
- STATE.result=data; STATE.loading=false; STATE.location=data.region||STATE.location; STATE.placeType=data.place_type||STATE.placeType; renderApp();
- if((data.ai_pending || data.details_pending) && retry<30) setTimeout(()=>{ if(STATE.currentPage===6 && run===resultRun) getResults(retry+1,run); },6000);
- } catch(err) { if(run!==resultRun)return; STATE.loading=false; STATE.error=err.message; renderApp(); }
+async function getResults(retry=0, run=++resultRun) {
+ // First request shows the loading view once; background polls keep the existing cards.
+ if(!retry) { STATE.loading=true; STATE.error=''; STATE.result=null; renderApp(); }
+ try {
+   const data=await api(`/api/rooms/${encodeURIComponent(STATE.id)}/recommend`,'POST',{});
+   if(run!==resultRun) return;
+   const previous=STATE.result;
+   STATE.result=data;
+   STATE.loading=false;
+   STATE.location=data.region||STATE.location;
+   STATE.placeType=data.place_type||STATE.placeType;
+   if(!retry) {
+     renderApp();
+   } else if(resultContentKey(data)!==resultContentKey(previous)) {
+     if(!patchResultView()) renderApp({quiet:true});
+   } else {
+     const status=$('result-status');
+     if(status) status.textContent=resultStatusText(data);
+   }
+   if((data.ai_pending || data.details_pending) && retry<30)
+     setTimeout(()=>{ if(STATE.currentPage===6 && run===resultRun) getResults(retry+1,run); },6000);
+ } catch(err) {
+   if(run!==resultRun) return;
+   STATE.loading=false;
+   STATE.error=err.message;
+   // Poll failures are reported in place; do not wipe successful recommendations.
+   if(retry && $('result-status')) $('result-status').textContent=STATE.error;
+   else renderApp();
+ }
 }
 function renderRoomLoadError(error) {
   const panel = document.createElement('div');
@@ -524,6 +592,20 @@ function renderRoomLoadError(error) {
    if(isSolo()) showResultsFrom(4);
    else STATE.currentPage=5;
  } else { STATE.me=null; STATE.location=STATE.room.region||STATE.room.summary?.region||''; STATE.currentPage=STATE.host?5:3; }
- } if(STATE.currentPage!==6) renderApp(); setInterval(async()=>{ if(STATE.id && STATE.currentPage===5 && !document.hidden) try { await refresh(); if(STATE.currentPage===5) renderApp(); } catch { /* keep last known state */ } },5000);
+ } if(STATE.currentPage!==6) renderApp();
+ let roomPollInFlight=false;
+ setInterval(async()=>{
+   if(roomPollInFlight || !STATE.id || STATE.currentPage!==5 || document.hidden) return;
+   const id=STATE.id;
+   roomPollInFlight=true;
+   try {
+     const previous=JSON.stringify(STATE.room);
+     const next=await api(`/api/rooms/${encodeURIComponent(id)}`);
+     if(STATE.id!==id) return;
+     STATE.room=next;
+     if(STATE.currentPage===5 && JSON.stringify(next)!==previous) renderApp({quiet:true});
+   } catch { /* keep the last known participant list; retry on next interval */ }
+   finally { roomPollInFlight=false; }
+ },5000);
  } catch(err) { $('page-viewport').textContent=err.message; }
 })();
