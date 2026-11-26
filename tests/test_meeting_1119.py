@@ -206,7 +206,7 @@ def test_every_restaurant_and_bar_style_has_a_business_type_or_name_rule():
     from moim.eatpl import BAR_TYPES, RESTAURANT_TYPES
     by_type = lambda types: {estimate._STYLE_BY_TYPE[t] for t in types if t in estimate._STYLE_BY_TYPE}
     assert set(options.STYLES["restaurant"]) <= by_type(RESTAURANT_TYPES)
-    assert set(options.STYLES["bar"]) - by_type(BAR_TYPES) == {"전통주"}
+    assert set(options.STYLES["bar"]) - by_type(BAR_TYPES) == {"전통주", "포차·소주"}  # 11/26: 기타주점은 잡다해서 이름으로만
     assert any(style == "전통주" for _, style, _ in estimate._STYLE_BY_NAME)
     place = {"id": "x", "name": "가게", "business_type": "칵테일바", "category": "bar"}
     assert "와인·칵테일 바" in estimate.rule_estimate(place, [])["styles"]
