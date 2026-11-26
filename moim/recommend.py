@@ -15,6 +15,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 import time
 from collections import Counter
+from itertools import zip_longest
 
 from . import details
 from .eatpl import BRUNCH_BUSINESS_TYPE, EXCLUDED_TYPES, EatplError, evidence_category, search_places
@@ -219,9 +220,33 @@ def _start_ai_job(key, ordered, place_type, allergens, store, api_key) -> dict:
 
 # 카페 검색('카페')에 안 잡히는 카페류 업종. 디저트·베이커리를 고른 사람을 위해 따로 검색한다.
 CAFE_EXTRA_TYPES = ("기타베이커리", "빵/도넛", "아이스크림/요거트/빙수", BRUNCH_BUSINESS_TYPE)
+# 지역만으로 검색하면 잇플이 매출 상위 100곳만 준다. 그 안에 양식·아시안·이자카야가 거의 없어서
+# (실측 2026-11-26: 강남 역삼동 100곳 중 양식 0곳, 업종 지정 시 이탈리아음식 20곳) 고른 종류의 업종으로 따로 검색한다.
+# 업종이 없는 종류(포차·소주·전통주)는 이름으로 판단하므로 술집 업종 전체를 더 검색한다.
+_NAME_ONLY_BAR_TYPES = ("기타주점", "주점", "호프")
+# 이름으로도 판단하는 식당 종류: '기타외국식'에 양식·아시안 식당이 많다
+_NAME_STYLE_TYPES = {"양식": ("기타외국식",), "아시안": ("기타외국식",)}
+MAX_STYLE_SEARCHES = 8
 
 
-def search_region(client, region: str, place_type: str, *, include_unknown: bool = False) -> list[dict]:
+def style_search_types(place_type: str, styles) -> list[str]:
+    from .estimate import _STYLE_BY_TYPE
+    # 한식·고기구이는 상위 100곳을 거의 다 차지하므로 따로 검색하지 않는다 (검색 횟수를 아껴 다른 종류에 쓴다)
+    wanted = [s for s in dict.fromkeys(styles or ()) if s not in ("한식", "고기-구이")]
+    # 종류마다 대표 업종부터 하나씩 돌아가며 담아서, 여러 종류를 골라도 한 종류가 검색 횟수를 다 쓰지 않게 한다
+    per_style = [[t for t, st in _STYLE_BY_TYPE.items() if st == style and t not in CAFE_EXTRA_TYPES]
+                 for style in wanted]
+    for style, found in zip(wanted, per_style):
+        found += [t for t in _NAME_STYLE_TYPES.get(style, ()) if t not in found]
+    types = list(dict.fromkeys(t for round_ in zip_longest(*per_style) for t in round_ if t))
+    if place_type == "bar" and {"포차·소주", "전통주"}.intersection(wanted):
+        types += [t for t in _NAME_ONLY_BAR_TYPES if t not in types]
+    return types[:MAX_STYLE_SEARCHES]
+
+
+
+def search_region(client, region: str, place_type: str, *, include_unknown: bool = False,
+                  styles=None) -> list[dict]:
     """지역 이름을 실제 주소 표기로 바꿔 검색하고 합친다 (샘플 데이터는 지역 이름 그대로).
 
     첫 검색이 실패하면 EatplError를 그대로 올리고, 보조 검색(두 번째 주소·카페류 업종) 실패는 건너뛴다.
@@ -262,10 +287,15 @@ def search_region(client, region: str, place_type: str, *, include_unknown: bool
         jobs.append((loc, None, True))
         if real and place_type == "cafe" and (not station or index == 0):
             jobs += [(loc, btype, False) for btype in CAFE_EXTRA_TYPES]
+        if real and (not station or index == 0):
+            jobs += [(loc, btype, True) for btype in style_search_types(place_type, styles)]
 
     def run(job):
         loc, btype, main = job
         try:
+            if main and btype:  # 고른 종류의 업종 검색: 카테고리 판정은 이름 규칙까지 거친다
+                return search_places(client, loc, place_type, include_unknown=include_unknown,
+                                     business_type=btype), None
             return (search_places(client, loc, place_type, include_unknown=include_unknown)
                     if main else client.search(loc, btype)), None
         except EatplError as e:
@@ -361,7 +391,8 @@ def recommend(people: list[dict], client, store=None, *, region: str | None = No
     if client.source != "sample" and station_input(region):
         out["station_radius_m"] = STATION_RADIUS_M
     try:
-        places = search_region(client, region, place_type, include_unknown=use_details)
+        picked = [s for s in summary["styles"][place_type] if s in STYLES[place_type]]
+        places = search_region(client, region, place_type, include_unknown=use_details, styles=picked)
     except (EatplError, StationLookupError) as e:
         out.update(status="error", message=str(e))
         return out
@@ -417,20 +448,34 @@ def recommend(people: list[dict], client, store=None, *, region: str | None = No
     out["warnings"] = warnings
     picked_styles = set(summary["styles"][place_type]) & set(STYLES[place_type])
     required_styles = set()
-    if place_type == "restaurant" or BRUNCH_STYLE in picked_styles or picked_styles == {ICE_CREAM_STYLE}:
+    if (place_type in ("restaurant", "bar") or BRUNCH_STYLE in picked_styles
+            or picked_styles == {ICE_CREAM_STYLE}):
         required_styles = picked_styles
-    scored = []
-    for p in places:
-        est = estimates[p["id"]]
-        if use_details and p["category"] == "unknown" and est.get("verified_category") != place_type:
-            continue
-        if required_styles and not required_styles.intersection(est["styles"]):
-            continue
-        s = score_place(p, est, people, place_type, allergy_people)
-        if s["excluded"]:
-            out["excluded"].append({"name": p["name"], "reason": s["reason"]})
-            continue
-        scored.append({**p, "estimate": est, **{k: s[k] for k in ("score", "reasons", "cautions")}})
+
+    def collect(required):
+        found, excluded = [], []
+        for p in places:
+            est = estimates[p["id"]]
+            if use_details and p["category"] == "unknown" and est.get("verified_category") != place_type:
+                continue
+            if required and not required.intersection(est["styles"]):
+                continue
+            s = score_place(p, est, people, place_type, allergy_people)
+            if s["excluded"]:
+                excluded.append({"name": p["name"], "reason": s["reason"]})
+                continue
+            found.append({**p, "estimate": est, **{k: s[k] for k in ("score", "reasons", "cautions")}})
+        return found, excluded
+
+    scored, out["excluded"] = collect(required_styles)
+    # 술집 종류(특히 업종이 없는 전통주·포차)는 맞는 곳이 없을 수 있다. 빈 화면 대신 다른 술집을 알려 준다.
+    if (place_type == "bar" and required_styles and not scored
+            and not (out["details_pending"] or out["ai_pending"])):
+        labels = ", ".join(tag for tag in STYLES[place_type] if tag in required_styles)
+        scored, out["excluded"] = collect(set())
+        if scored:
+            warnings.append(f"{labels}(으)로 확인된 술집이 없어 이 지역의 다른 술집을 보여드려요.")
+        required_styles = set()
     wants_dessert = place_type == "cafe" and DESSERT_STYLE in summary["styles"]["cafe"]
     scored.sort(key=lambda p: (
         wants_dessert and not p["estimate"].get("dessert_items"),

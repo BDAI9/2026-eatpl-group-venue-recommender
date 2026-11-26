@@ -32,6 +32,10 @@ EXCLUDED_TYPES = {"유흥주점", "클럽", "주류판매점", "무인식품점"
 # 업종 표기가 틀린 가게가 있어(예: 커피 체인이 '고기구이') 이름에 분명한 단서가 있으면 이름을 따른다
 _BAR_NAME = ("술집", "포차", "호프", "펍", "이자카야", "pub", "izakaya")
 _CAFE_NAME = ("커피", "카페", "까페", "coffee", "cafe", "베이커리", "bakery")
+# 실데이터(2026-11-26): 잇플이 커피·도넛 체인을 '서양음식'·'기타외국식'·'기타주점'으로 등록한 경우가 많다
+# (예: 크리스피크림·팔레트 젤라또=기타외국식, 우지커피=기타주점). 식당·술집 추천에 섞이지 않게 카페로 본다.
+_CAFE_NAME += ("투썸", "스타벅스", "이디야", "할리스", "폴바셋", "빽다방", "컴포즈", "메가엠지씨", "메가커피", "커피빈",
+               "블루보틀", "팀홀튼", "크리스피", "던킨", "도넛", "파리바게", "뚜레쥬르", "공차", "배스킨", "설빙", "젤라또")
 
 
 class EatplError(Exception):
@@ -233,14 +237,17 @@ def evidence_category(place: dict) -> str:
     return "unknown"
 
 
-def search_places(client, region: str, place_type: str, *, include_unknown: bool = False) -> list[dict]:
+def search_places(client, region: str, place_type: str, *, include_unknown: bool = False,
+                  business_type: str | None = None) -> list[dict]:
     """지역과 장소 종류로 후보를 모은다.
 
     실제 술집 검색은 제공처의 대분류 둘로 조회하고 응답 소분류로 다시 거른다.
     업종 체계가 일치하지 않거나 응답 건수에 제한이 있어 완전한 목록은 아니다.
     """
     seen, out = set(), []
-    if place_type == "cafe" and client.source != "sample":
+    if business_type:
+        calls = [(business_type,)]
+    elif place_type == "cafe" and client.source != "sample":
         calls = [("카페",)]
     elif place_type == "bar" and client.source == "kskill":
         calls = [("주점",), ("칵테일바",)]
